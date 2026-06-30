@@ -1,10 +1,16 @@
-using CostOfLivingDashboard.Components;
+using PricePulse.Components;
+using PricePulse.Fred;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+builder.Services.AddHttpClient<FredClient>(client =>
+{
+    client.BaseAddress = new Uri("https://api.stlouisfed.org/");
+});
 
 var app = builder.Build();
 

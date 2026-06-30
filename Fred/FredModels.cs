@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace CostOfLivingDashboard.Fred;
+namespace PricePulse.Fred;
 
 public record FredObservationsResponse(
     [property: JsonPropertyName("observations")] IReadOnlyList<FredObservation> Observations);
