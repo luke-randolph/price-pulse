@@ -1,0 +1,124 @@
+@page "/"
+@using PricePulse.Data
+@inject PriceService Prices
+@rendermode InteractiveServer
+
+<PageTitle>Dashboard</PageTitle>
+
+<div class="dashboard">
+    <h1>Dashboard</h1>
+    <p class="text-muted">U.S. national average prices, updated monthly from the Bureau of Labor Statistics via FRED.
+    </p>
+
+    @if (error is not null)
+    {
+        <p class="text-danger">Error: @error</p>
+    }
+    else if (cards is null)
+    {
+        <p>Loading…</p>
+    }
+    else
+    {
+        <div class="row g-3">
+            @foreach (var card in cards)
+            {
+                <div class="col-12 col-sm-6 col-lg-4">
+                    <a href="@($"series/{card.Series.Id}")" class="text-reset text-decoration-none">
+                        <RadzenCard class="h-100 dashboard-card">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div>
+                                    <div class="fw-semibold">@card.Series.Name</div>
+                                    <div class="text-primary small">@card.Series.Units</div>
+                                </div>
+                                <SeriesIcon Icon="@card.Series.Icon" />
+                            </div>
+
+                            <div class="d-flex align-items-baseline justify-content-between mb-2">
+                                <span style="font-size: 1.6rem; font-weight: 600;">
+                                    @(card.Latest?.ToString("C2") ?? "—")
+                                </span>
+                                @if (card.YoyPercent is not null)
+                                {
+                                    <span class="small @(card.YoyPercent >= 0 ? "text-danger" : "text-success")">
+                                        @(card.YoyPercent >= 0 ? "▲" : "▼") @Math.Abs(card.YoyPercent.Value).ToString("0.0")%
+                                        <span class="text-muted">vs 1 yr ago</span>
+                                    </span>
+                                }
+                            </div>
+
+                            @if (card.Spark.Count > 0)
+                            {
+                                <ApexChart TItem="SparkPoint" Height="48" Options="@card.SparkOptions">
+                                    <ApexPointSeries TItem="SparkPoint" Items="@card.Spark" XValue="@(p => p.Date)"
+                                                     YValue="@(p => p.Value)" SeriesType="SeriesType.Line" />
+                                </ApexChart>
+                            }
+                        </RadzenCard>
+                    </a>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private List<SeriesCard>? cards;
+    private string? error;
+
+    // Each chart needs its own options instance — ApexCharts writes per-chart state into it.
+    private static ApexChartOptions<SparkPoint> MakeSparkOptions() => new()
+    {
+        Chart = new Chart { Sparkline = new ChartSparkline { Enabled = true } },
+        Stroke = new Stroke { Curve = Curve.Smooth, Width = 2 },
+        Xaxis = new XAxis { Type = XAxisType.Datetime }
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var catalog = await Prices.GetSeriesAsync();
+            var result = new List<SeriesCard>();
+
+            foreach (var s in catalog)
+            {
+                var priced = (await Prices.GetObservationsAsync(s.Id))
+                    .Where(o => o.Value is not null)
+                    .Select(o => new SparkPoint(o.Date.ToDateTime(TimeOnly.MinValue), o.Value!.Value))
+                    .ToList();
+
+                if (priced.Count == 0)
+                {
+                    result.Add(new SeriesCard(s, null, null, Array.Empty<SparkPoint>(), MakeSparkOptions()));
+                    continue;
+                }
+
+                var latest = priced[^1];
+
+                decimal? yoy = null;
+                var yearAgo = priced.LastOrDefault(p => p.Date <= latest.Date.AddYears(-1));
+                if (yearAgo is not null && yearAgo.Value != 0)
+                {
+                    yoy = (latest.Value - yearAgo.Value) / yearAgo.Value * 100m;
+                }
+
+                var sparkCutoff = latest.Date.AddYears(-10);
+                var spark = priced.Where(p => p.Date >= sparkCutoff).ToList();
+
+                result.Add(new SeriesCard(s, latest.Value, yoy, spark, MakeSparkOptions()));
+            }
+
+            cards = result;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private record SparkPoint(DateTime Date, decimal Value);
+
+    private record SeriesCard(Series Series, decimal? Latest, decimal? YoyPercent, IReadOnlyList<SparkPoint> Spark,
+ApexChartOptions<SparkPoint> SparkOptions);
+}

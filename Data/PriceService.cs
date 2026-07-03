@@ -14,6 +14,13 @@ public class PriceService
         _fred = fred;
     }
 
+    public async Task<IReadOnlyList<Series>> GetSeriesAsync(CancellationToken ct = default)
+    {
+        return await _db.Series
+            .OrderBy(s => s.Name)
+            .ToListAsync(ct);
+    }
+
     public async Task<IReadOnlyList<Observation>> GetObservationsAsync(string seriesId, CancellationToken ct = default)
     {
         var stored = await _db.Observations

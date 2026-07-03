@@ -1,0 +1,14 @@
+.dashboard ::deep .series-icon {
+    color: inherit;
+    font-size: 1.25rem;
+    vertical-align: middle;
+}
+
+.dashboard ::deep .dashboard-card {
+    cursor: pointer;
+    transition: box-shadow 0.15s ease-in-out;
+}
+
+.dashboard ::deep .dashboard-card:hover {
+    box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.15);
+}

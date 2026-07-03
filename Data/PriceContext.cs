@@ -18,11 +18,11 @@ public class PriceContext : DbContext
             .IsUnique();
 
         modelBuilder.Entity<Series>().HasData(
-            new Series { Id = "APU0000708111", Name = "Eggs", Units = "per dozen" },
-            new Series { Id = "APU0000709112", Name = "Milk", Units = "per gallon" },
-            new Series { Id = "APU000074714", Name = "Gasoline", Units = "per gallon" },
-            new Series { Id = "APU000072610", Name = "Electricity", Units = "per kWh" },
-            new Series { Id = "APU0000702111", Name = "Bread", Units = "per pound" },
-            new Series { Id = "APU0000703112", Name = "Ground Beef", Units = "per pound" });
+            new Series { Id = "APU0000708111", Name = "Eggs", Units = "per dozen", Icon = "egg" },
+            new Series { Id = "APU0000709112", Name = "Milk", Units = "per gallon", Icon = "svg:milk" },
+            new Series { Id = "APU000074714", Name = "Gasoline", Units = "per gallon", Icon = "local_gas_station" },
+            new Series { Id = "APU000072610", Name = "Electricity", Units = "per kWh", Icon = "bolt" },
+            new Series { Id = "APU0000702111", Name = "Bread", Units = "per pound", Icon = "bakery_dining" },
+            new Series { Id = "APU0000703112", Name = "Ground Beef", Units = "per pound", Icon = "lunch_dining" });
     }
 }

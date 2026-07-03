@@ -1,0 +1,140 @@
+@page "/series/{Id}"
+@using PricePulse.Data
+@inject PriceService Prices
+@rendermode InteractiveServer
+
+<PageTitle>@(series?.Name ?? "Series")</PageTitle>
+
+@if (error is not null)
+{
+    <p class="text-danger">Error: @error</p>
+}
+else if (points is null)
+{
+    <p>Loading…</p>
+}
+else if (series is null)
+{
+    <p>Unknown series '<strong>@Id</strong>'.</p>
+}
+else
+{
+    <h1>@series.Name</h1>
+    <p class="text-primary mb-1">@series.Units</p>
+    <p class="text-muted">U.S. national average, not seasonally adjusted.</p>
+
+    @if (latest is not null)
+    {
+        <RadzenCard class="mb-4" style="max-width: 20rem;">
+            <div class="text-muted">Most recent national average</div>
+            <div style="font-size: 2rem; font-weight: 600;">@latest.Value.ToString("C2")</div>
+            <div class="text-muted">@latest.Date.ToString("MMMM yyyy")</div>
+        </RadzenCard>
+    }
+
+    @if (points.Count > 0)
+    {
+        <RadzenSelectBar @bind-Value="rangeYears" TValue="int" Size="ButtonSize.Small" class="mb-3">
+            <Items>
+                <RadzenSelectBarItem Text="Past year" Value="1" />
+                <RadzenSelectBarItem Text="Last 10 years" Value="10" />
+                <RadzenSelectBarItem Text="Last 50 years" Value="50" />
+            </Items>
+        </RadzenSelectBar>
+
+        @if (Filtered.Count > 0)
+        {
+            <ApexChart TItem="ChartPoint" @key="rangeYears" Height="400" Options="@options">
+                <ApexPointSeries TItem="ChartPoint"
+                                 Items="@Filtered"
+                                 Name="@series.Name"
+                                 XValue="@(p => p.Date)"
+                                 YValue="@(p => p.Value)"
+                                 SeriesType="SeriesType.Line" />
+            </ApexChart>
+        }
+        else
+        {
+            <p class="text-muted">No data in the selected range.</p>
+        }
+    }
+    else
+    {
+        <p>No priced observations available for this series.</p>
+    }
+
+    <p class="text-muted small mt-4">
+        Source: <a href="@($"https://fred.stlouisfed.org/series/{series.Id}")" target="_blank" rel="noopener">FRED</a> / <a href="https://www.bls.gov/cpi/" target="_blank" rel="noopener">U.S. Bureau of Labor Statistics</a>.
+    </p>
+}
+
+@code {
+    [Parameter]
+    public string Id { get; set; } = "";
+
+    private Series? series;
+    private List<ChartPoint>? points;
+    private ChartPoint? latest;
+    private string? error;
+    private string? loadedId;
+    private int rangeYears = 10;
+
+    private readonly ApexChartOptions<ChartPoint> options = new()
+    {
+        Chart = new Chart { Toolbar = new Toolbar { Show = false } },
+        Stroke = new Stroke { Curve = Curve.Straight, Width = 2 },
+        Xaxis = new XAxis { Type = XAxisType.Datetime },
+        Yaxis = new List<YAxis>
+        {
+            new YAxis { Labels = new YAxisLabels { Formatter = "function (val) { return '$' + val.toFixed(2); }" } }
+        },
+        Tooltip = new ApexCharts.Tooltip { X = new TooltipX { Format = "MMM yyyy" } }
+    };
+
+    private IReadOnlyList<ChartPoint> Filtered
+    {
+        get
+        {
+            if (points is null || points.Count == 0)
+            {
+                return Array.Empty<ChartPoint>();
+            }
+
+            var cutoff = points[^1].Date.AddYears(-rangeYears);
+            return points.Where(p => p.Date >= cutoff).ToList();
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Id == loadedId)
+        {
+            return;
+        }
+
+        loadedId = Id;
+        series = null;
+        points = null;
+        latest = null;
+        error = null;
+
+        try
+        {
+            var catalog = await Prices.GetSeriesAsync();
+            series = catalog.FirstOrDefault(s => s.Id == Id);
+
+            var observations = await Prices.GetObservationsAsync(Id);
+            points = observations
+                .Where(o => o.Value is not null)
+                .Select(o => new ChartPoint(o.Date.ToDateTime(TimeOnly.MinValue), o.Value!.Value))
+                .ToList();
+            latest = points.LastOrDefault();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private record ChartPoint(DateTime Date, decimal Value);
+}

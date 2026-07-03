@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using PricePulse.Data;
 
@@ -10,9 +11,11 @@ using PricePulse.Data;
 namespace PricePulse.Migrations
 {
     [DbContext(typeof(PriceContext))]
-    partial class PriceContextModelSnapshot : ModelSnapshot
+    [Migration("20260703194118_AddSeriesIcon")]
+    partial class AddSeriesIcon
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.6");
@@ -73,7 +76,7 @@ namespace PricePulse.Migrations
                         new
                         {
                             Id = "APU0000709112",
-                            Icon = "svg:milk",
+                            Icon = "local_drink",
                             Name = "Milk",
                             Units = "per gallon"
                         },
