@@ -1,3 +1,6 @@
+@using PricePulse.Data
+@inject PriceService Prices
+
 <div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
         <a class="navbar-brand" href="">Price Pulse</a>
@@ -10,9 +13,29 @@
     <nav class="nav flex-column">
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
+                <RadzenIcon Icon="trending_up" class="series-icon" /> Dashboard
             </NavLink>
         </div>
+
+        @if (series is not null)
+        {
+            @foreach (var s in series)
+            {
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="@($"series/{s.Id}")">
+                        <SeriesIcon Icon="@s.Icon" /> @s.Name
+                    </NavLink>
+                </div>
+            }
+        }
     </nav>
 </div>
 
+@code {
+    private IReadOnlyList<Series>? series;
+
+    protected override async Task OnInitializedAsync()
+    {
+        series = await Prices.GetSeriesAsync();
+    }
+}

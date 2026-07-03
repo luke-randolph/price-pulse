@@ -2,6 +2,8 @@ using Microsoft.EntityFrameworkCore;
 using PricePulse.Components;
 using PricePulse.Data;
 using PricePulse.Fred;
+using ApexCharts;
+using Radzen;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,6 +21,10 @@ builder.Services.AddDbContext<PriceContext>(options =>
         ?? "Data Source=pricepulse.db"));
 
 builder.Services.AddScoped<PriceService>();
+
+builder.Services.AddRadzenComponents();
+
+builder.Services.AddApexCharts();
 
 var app = builder.Build();
 
