@@ -1,4 +1,6 @@
+using Microsoft.EntityFrameworkCore;
 using PricePulse.Components;
+using PricePulse.Data;
 using PricePulse.Fred;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -12,7 +14,20 @@ builder.Services.AddHttpClient<FredClient>(client =>
     client.BaseAddress = new Uri("https://api.stlouisfed.org/");
 });
 
+builder.Services.AddDbContext<PriceContext>(options =>
+    options.UseSqlite(builder.Configuration.GetConnectionString("PriceDb")
+        ?? "Data Source=pricepulse.db"));
+
+builder.Services.AddScoped<PriceService>();
+
 var app = builder.Build();
+
+// Apply any pending migrations and create the database file on startup.
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<PriceContext>();
+    db.Database.Migrate();
+}
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
