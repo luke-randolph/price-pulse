@@ -1,6 +1,6 @@
 @page "/"
-@using PricePulse.Fred
-@inject FredClient Fred
+@using PricePulse.Data
+@inject PriceService Prices
 
 <PageTitle>Home</PageTitle>
 
@@ -10,14 +10,14 @@
 {
     <p style="color:red">Error: @error</p>
 }
-else if (points is null)
+else if (observations is null)
 {
     <p>Loading…</p>
 }
 else
 {
-    var latest = points.LastOrDefault(p => p.Value is not null);
-    <p>Loaded <strong>@points.Count</strong> observations for eggs (price per dozen).</p>
+    var latest = observations.LastOrDefault(o => o.Value is not null);
+    <p>Loaded <strong>@observations.Count</strong> observations for eggs (price per dozen).</p>
     @if (latest is not null)
     {
         <p>Most recent: <strong>@latest.Date</strong> = <strong>$@latest.Value</strong></p>
@@ -25,14 +25,14 @@ else
 }
 
 @code {
-    private IReadOnlyList<PricePoint>? points;
+    private IReadOnlyList<Observation>? observations;
     private string? error;
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            points = await Fred.GetSeriesAsync("APU0000708111");
+            observations = await Prices.GetObservationsAsync("APU0000708111");
         }
         catch (Exception ex)
         {
