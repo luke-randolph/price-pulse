@@ -9,7 +9,7 @@
 {
     <p class="text-danger">Error: @error</p>
 }
-else if (points is null)
+else if (projections is null)
 {
     <p>Loading…</p>
 }
@@ -23,17 +23,47 @@ else
     <p class="text-primary mb-1">@series.Units</p>
     <p class="text-muted">U.S. national average, not seasonally adjusted.</p>
 
-    @if (latest is not null)
+    @if (Displayed.Count > 0)
     {
-        <RadzenCard class="mb-4" style="max-width: 20rem;">
-            <div class="text-muted">Most recent national average</div>
-            <div style="font-size: 2rem; font-weight: 600;">@latest.Value.ToString("C2")</div>
-            <div class="text-muted">@latest.Date.ToString("MMMM yyyy")</div>
-        </RadzenCard>
-    }
+        <RadzenSelectBar @bind-Value="lens" @bind-Value:after="OnLensChanged" TValue="PriceLens" Size="ButtonSize.Small"
+                         class="mb-3">
+            <Items>
+                <RadzenSelectBarItem Text="Dollars" Value="PriceLens.Nominal" />
+                <RadzenSelectBarItem Text="Inflation adjusted" Value="PriceLens.RealDollars" />
+                <RadzenSelectBarItem Text="Work-time" Value="PriceLens.TimePrice" />
+            </Items>
+        </RadzenSelectBar>
 
-    @if (points.Count > 0)
-    {
+        @if (LensHelp is not null)
+        {
+            <p class="text-muted small mb-3 d-flex align-items-center gap-1">
+                <RadzenIcon Icon="info" Style="font-size: 1rem;" />@LensHelp
+            </p>
+        }
+
+        @if (lens == PriceLens.TimePrice)
+        {
+            <div class="d-flex align-items-center gap-2 mb-3">
+                <span class="text-muted small">Your pay:</span>
+                <RadzenNumeric TValue="decimal?" @bind-Value="customRate" Placeholder="@AvgWagePlaceholder" Style="width: 16rem;" />
+                <RadzenSelectBar @bind-Value="rateIsSalary" TValue="bool" Size="ButtonSize.Small">
+                    <Items>
+                        <RadzenSelectBarItem Text="/ hr" Value="false" />
+                        <RadzenSelectBarItem Text="/ yr" Value="true" />
+                    </Items>
+                </RadzenSelectBar>
+            </div>
+        }
+
+        @if (HeadlineValue is not null)
+        {
+            <RadzenCard class="mb-4" style="max-width: 22rem;">
+                <div class="text-muted">@HeadlineTitle</div>
+                <div style="font-size: 2rem; font-weight: 600;">@HeadlineValue</div>
+                <div class="text-muted">@HeadlineSubtitle</div>
+            </RadzenCard>
+        }
+
         <RadzenSelectBar @bind-Value="rangeYears" TValue="int" Size="ButtonSize.Small" class="mb-3">
             <Items>
                 <RadzenSelectBarItem Text="Past year" Value="1" />
@@ -44,13 +74,9 @@ else
 
         @if (Filtered.Count > 0)
         {
-            <ApexChart TItem="ChartPoint" @key="rangeYears" Height="400" Options="@options">
-                <ApexPointSeries TItem="ChartPoint"
-                                 Items="@Filtered"
-                                 Name="@series.Name"
-                                 XValue="@(p => p.Date)"
-                                 YValue="@(p => p.Value)"
-                                 SeriesType="SeriesType.Line" />
+            <ApexChart TItem="LensPoint" @key="@($"{rangeYears}-{lens}")" Height="400" Options="@options">
+                <ApexPointSeries TItem="LensPoint" Items="@Filtered" Name="@series.Name" XValue="@(p => p.Date)"
+                                 YValue="@(p => p.Value)" SeriesType="SeriesType.Line" />
             </ApexChart>
         }
         else
@@ -64,7 +90,8 @@ else
     }
 
     <p class="text-muted small mt-4">
-        Source: <a href="@($"https://fred.stlouisfed.org/series/{series.Id}")" target="_blank" rel="noopener">FRED</a> / <a href="https://www.bls.gov/cpi/" target="_blank" rel="noopener">U.S. Bureau of Labor Statistics</a>.
+        Source: <a href="@($"https://fred.stlouisfed.org/series/{series.Id}")" target="_blank" rel="noopener">FRED</a> / <a
+        href="https://www.bls.gov/cpi/" target="_blank" rel="noopener">U.S. Bureau of Labor Statistics</a>.
     </p>
 }
 
@@ -73,37 +100,119 @@ else
     public string Id { get; set; } = "";
 
     private Series? series;
-    private List<ChartPoint>? points;
-    private ChartPoint? latest;
+    private Dictionary<PriceLens, IReadOnlyList<LensPoint>>? projections;
+    private decimal? latestNominal;
+    private DateTime? latestNominalDate;
+    private decimal? averageWage;
+    private DateTime? baseMonth;
     private string? error;
     private string? loadedId;
-    private int rangeYears = 10;
 
-    private readonly ApexChartOptions<ChartPoint> options = new()
+    private int rangeYears = 10;
+    private PriceLens lens = PriceLens.Nominal;
+    private decimal? customRate;
+    private bool rateIsSalary;
+
+    private const decimal HoursPerWorkYear = 2080m;
+
+    private ApexChartOptions<LensPoint> options = BuildOptions(PriceLens.Nominal);
+
+    private IReadOnlyList<LensPoint> Displayed =>
+        projections is not null && projections.TryGetValue(lens, out var pts) ? pts : Array.Empty<LensPoint>();
+
+    private IReadOnlyList<LensPoint> Filtered
+    {
+        get
+        {
+            var pts = Displayed;
+            if (pts.Count == 0)
+            {
+                return Array.Empty<LensPoint>();
+            }
+
+            var cutoff = pts[^1].Date.AddYears(-rangeYears);
+            return pts.Where(p => p.Date >= cutoff).ToList();
+        }
+    }
+
+    // Custom rate → hourly (salary assumes a 2,080-hour work year).
+    private decimal? HourlyWage =>
+        customRate is { } r && r > 0 ? (rateIsSalary ? r / HoursPerWorkYear : r) : null;
+
+    // Personalization affects only this headline number, never the curve.
+    private bool Personalized => lens == PriceLens.TimePrice && HourlyWage is not null;
+
+    private string? HeadlineValue
+    {
+        get
+        {
+            if (Displayed.Count == 0)
+            {
+                return null;
+            }
+
+            if (Personalized && latestNominal is { } price)
+            {
+                return Lens.FormatWorkTime(Lens.TimePriceAt(price, HourlyWage!.Value));
+            }
+
+            return Lens.Format(Displayed[^1].Value, lens);
+        }
+    }
+
+    private string HeadlineTitle => lens switch
+    {
+        PriceLens.RealDollars => "Most recent, in today's dollars",
+        PriceLens.TimePrice when Personalized => $"Most recent, {RateLabel}",
+        PriceLens.TimePrice => "Most recent, average non-executive worker",
+        _ => "Most recent national average"
+    };
+
+    private string HeadlineSubtitle
+    {
+        get
+        {
+            var date = Personalized ? latestNominalDate : Displayed[^1].Date;
+            var when = date?.ToString("MMMM yyyy") ?? "";
+
+            return lens == PriceLens.TimePrice && latestNominal is { } price
+                ? $"{price:C2} · {when}"
+                : when;
+        }
+    }
+
+    private string RateLabel =>
+        rateIsSalary ? $"at {customRate:C0}/yr" : $"at {customRate:C2}/hr";
+
+    private string AvgWagePlaceholder
+    {
+        get
+        {
+            if (averageWage is not { } w) return "average non-executive worker";
+            return rateIsSalary ? $"avg non-executive: {w * HoursPerWorkYear:C0}" : $"avg non-executive: {w:C2}";
+        }
+    }
+
+    private string? LensHelp => lens switch
+    {
+        PriceLens.RealDollars => "Past prices restated in today's dollars using CPI, so amounts compare like-for-like.",
+        PriceLens.TimePrice => "How long you'd work to afford it, at average non-executive pay — enter your pay to personalize.",
+        _ => null
+    };
+
+    private void OnLensChanged() => options = BuildOptions(lens);
+
+    private static ApexChartOptions<LensPoint> BuildOptions(PriceLens l) => new()
     {
         Chart = new Chart { Toolbar = new Toolbar { Show = false } },
         Stroke = new Stroke { Curve = Curve.Straight, Width = 2 },
         Xaxis = new XAxis { Type = XAxisType.Datetime },
         Yaxis = new List<YAxis>
         {
-            new YAxis { Labels = new YAxisLabels { Formatter = "function (val) { return '$' + val.toFixed(2); }" } }
+            new YAxis { Labels = new YAxisLabels { Formatter = Lens.AxisFormatter(l) } }
         },
         Tooltip = new ApexCharts.Tooltip { X = new TooltipX { Format = "MMM yyyy" } }
     };
-
-    private IReadOnlyList<ChartPoint> Filtered
-    {
-        get
-        {
-            if (points is null || points.Count == 0)
-            {
-                return Array.Empty<ChartPoint>();
-            }
-
-            var cutoff = points[^1].Date.AddYears(-rangeYears);
-            return points.Where(p => p.Date >= cutoff).ToList();
-        }
-    }
 
     protected override async Task OnParametersSetAsync()
     {
@@ -114,8 +223,8 @@ else
 
         loadedId = Id;
         series = null;
-        points = null;
-        latest = null;
+        projections = null;
+        latestNominal = null;
         error = null;
 
         try
@@ -123,18 +232,26 @@ else
             var catalog = await Prices.GetSeriesAsync();
             series = catalog.FirstOrDefault(s => s.Id == Id);
 
-            var observations = await Prices.GetObservationsAsync(Id);
-            points = observations
-                .Where(o => o.Value is not null)
-                .Select(o => new ChartPoint(o.Date.ToDateTime(TimeOnly.MinValue), o.Value!.Value))
-                .ToList();
-            latest = points.LastOrDefault();
+            var nominal = await Prices.GetObservationsAsync(Id);
+            var cpi = await Prices.GetObservationsAsync(Lens.CpiSeriesId);
+            var wages = await Prices.GetObservationsAsync(Lens.WageSeriesId);
+
+            projections = new()
+            {
+                [PriceLens.Nominal] = Lens.Apply(PriceLens.Nominal, nominal, null),
+                [PriceLens.RealDollars] = Lens.Apply(PriceLens.RealDollars, nominal, cpi),
+                [PriceLens.TimePrice] = Lens.Apply(PriceLens.TimePrice, nominal, wages)
+            };
+
+            var lastNominal = projections[PriceLens.Nominal].LastOrDefault();
+            latestNominal = lastNominal?.Value;
+            latestNominalDate = lastNominal?.Date;
+            averageWage = wages.Where(o => o.Value is not null).LastOrDefault()?.Value;
+            baseMonth = Lens.BaseMonth(cpi);
         }
         catch (Exception ex)
         {
             error = ex.Message;
         }
     }
-
-    private record ChartPoint(DateTime Date, decimal Value);
 }
