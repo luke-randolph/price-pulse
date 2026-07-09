@@ -286,9 +286,18 @@ else
 
     private void OnLensChanged() => options = BuildOptions(lens, kind);
 
+    // Mirror the palette in wwwroot/app.css; the line takes on the active lens's color.
+    private static string LensColor(PriceLens l) => l switch
+    {
+        PriceLens.RealDollars => "#3949ab", // --blue
+        PriceLens.TimePrice => "#7c3aed",   // --purple
+        _ => "#4f46e5"                       // --indigo (--primary)
+    };
+
     private static ApexChartOptions<LensPoint> BuildOptions(PriceLens l, SeriesKind k) => new()
     {
         Chart = new Chart { Toolbar = new Toolbar { Show = false } },
+        Colors = new List<string> { LensColor(l) },
         Stroke = new Stroke { Curve = Curve.Straight, Width = 2 },
         Xaxis = new XAxis { Type = XAxisType.Datetime },
         Yaxis = new List<YAxis>
