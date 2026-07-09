@@ -76,9 +76,13 @@
     private string? error;
 
     // Each chart needs its own options instance — ApexCharts writes per-chart state into it.
+    // Mirrors --primary in wwwroot/app.css.
+    private const string BrandPrimary = "#4f46e5";
+
     private static ApexChartOptions<SparkPoint> MakeSparkOptions() => new()
     {
         Chart = new Chart { Sparkline = new ChartSparkline { Enabled = true } },
+        Colors = new List<string> { BrandPrimary },
         Stroke = new Stroke { Curve = Curve.Smooth, Width = 2 },
         Xaxis = new XAxis { Type = XAxisType.Datetime }
     };
