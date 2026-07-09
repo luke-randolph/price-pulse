@@ -1,5 +1,6 @@
 @using PricePulse.Data
 @inject PriceService Prices
+@inject NavigationManager Nav
 
 <div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
@@ -19,13 +20,21 @@
 
         @if (series is not null)
         {
-            @foreach (var s in series)
+            @foreach (var group in series.GroupBy(s => s.Category))
             {
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="@($"series/{s.Id}")">
-                        <SeriesIcon Icon="@s.Icon" /> @s.Name
-                    </NavLink>
-                </div>
+                <details class="nav-group" open="@group.Any(s => Nav.Uri.EndsWith(s.Id))">
+                    <summary class="nav-group-title px-3 py-2 small text-uppercase fw-bold">
+                        @group.Key.Label()
+                    </summary>
+                    @foreach (var s in group)
+                    {
+                        <div class="nav-item px-3">
+                            <NavLink class="nav-link" href="@($"series/{s.Id}")">
+                                <SeriesIcon Icon="@s.Icon" /> @s.Name
+                            </NavLink>
+                        </div>
+                    }
+                </details>
             }
         }
     </nav>

@@ -21,18 +21,40 @@ else
 {
     <h1>@series.Name</h1>
     <p class="text-primary mb-1">@series.Units</p>
-    <p class="text-muted">U.S. national average, not seasonally adjusted.</p>
+    @if (kind == SeriesKind.PriceIndex)
+    {
+        <p class="text-muted small mb-3" style="max-width: 40rem;">
+            A price index tracks how prices move relative to a baseline period (set to 100) — it's a level,
+            not a dollar amount. A value of 300 means prices are 3× the baseline.
+        </p>
+    }
+    else if (kind == SeriesKind.Indicator)
+    {
+        <p class="text-muted small mb-3" style="max-width: 40rem;">
+            How much the economy produces for each hour worked. It's an index (100 = the baseline year),
+            so rising means each hour of work creates more value than before.
+        </p>
+    }
 
     @if (Displayed.Count > 0)
     {
-        <RadzenSelectBar @bind-Value="lens" @bind-Value:after="OnLensChanged" TValue="PriceLens" Size="ButtonSize.Small"
-                         class="mb-3">
-            <Items>
-                <RadzenSelectBarItem Text="Dollars" Value="PriceLens.Nominal" />
-                <RadzenSelectBarItem Text="Inflation adjusted" Value="PriceLens.RealDollars" />
-                <RadzenSelectBarItem Text="Work-time" Value="PriceLens.TimePrice" />
-            </Items>
-        </RadzenSelectBar>
+        @if (available.Count > 1)
+        {
+            <RadzenSelectBar @bind-Value="lens" @bind-Value:after="OnLensChanged" TValue="PriceLens" Size="ButtonSize.Small"
+                             class="mb-3">
+                <Items>
+                    <RadzenSelectBarItem Text="@NominalLabel" Value="PriceLens.Nominal" />
+                    @if (available.Contains(PriceLens.RealDollars))
+                    {
+                        <RadzenSelectBarItem Text="Inflation adjusted" Value="PriceLens.RealDollars" />
+                    }
+                    @if (available.Contains(PriceLens.TimePrice))
+                    {
+                        <RadzenSelectBarItem Text="Work-time" Value="PriceLens.TimePrice" />
+                    }
+                </Items>
+            </RadzenSelectBar>
+        }
 
         @if (LensHelp is not null)
         {
@@ -57,10 +79,14 @@ else
 
         @if (HeadlineValue is not null)
         {
-            <RadzenCard class="mb-4" style="max-width: 22rem;">
+            <RadzenCard class="mb-4" style="max-width: 26rem;">
                 <div class="text-muted">@HeadlineTitle</div>
                 <div style="font-size: 2rem; font-weight: 600;">@HeadlineValue</div>
                 <div class="text-muted">@HeadlineSubtitle</div>
+                @if (ComparativeText is not null)
+                {
+                    <div class="text-muted small mt-2 fst-italic">@ComparativeText</div>
+                }
             </RadzenCard>
         }
 
@@ -86,12 +112,12 @@ else
     }
     else
     {
-        <p>No priced observations available for this series.</p>
+        <p>No observations available for this series.</p>
     }
 
     <p class="text-muted small mt-4">
-        Source: <a href="@($"https://fred.stlouisfed.org/series/{series.Id}")" target="_blank" rel="noopener">FRED</a> / <a
-        href="https://www.bls.gov/cpi/" target="_blank" rel="noopener">U.S. Bureau of Labor Statistics</a>.
+        Source: <a href="@($"https://fred.stlouisfed.org/series/{series.Id}")" target="_blank" rel="noopener">FRED</a>
+        (@series.Id).
     </p>
 }
 
@@ -100,6 +126,8 @@ else
     public string Id { get; set; } = "";
 
     private Series? series;
+    private SeriesKind kind;
+    private IReadOnlyList<PriceLens> available = new[] { PriceLens.Nominal };
     private Dictionary<PriceLens, IReadOnlyList<LensPoint>>? projections;
     private decimal? latestNominal;
     private DateTime? latestNominalDate;
@@ -115,7 +143,7 @@ else
 
     private const decimal HoursPerWorkYear = 2080m;
 
-    private ApexChartOptions<LensPoint> options = BuildOptions(PriceLens.Nominal);
+    private ApexChartOptions<LensPoint> options = BuildOptions(PriceLens.Nominal, SeriesKind.Price);
 
     private IReadOnlyList<LensPoint> Displayed =>
         projections is not null && projections.TryGetValue(lens, out var pts) ? pts : Array.Empty<LensPoint>();
@@ -142,6 +170,8 @@ else
     // Personalization affects only this headline number, never the curve.
     private bool Personalized => lens == PriceLens.TimePrice && HourlyWage is not null;
 
+    private string NominalLabel => Lens.IsDollar(kind) ? "Dollars" : "Index";
+
     private string? HeadlineValue
     {
         get
@@ -156,16 +186,17 @@ else
                 return Lens.FormatWorkTime(Lens.TimePriceAt(price, HourlyWage!.Value));
             }
 
-            return Lens.Format(Displayed[^1].Value, lens);
+            return Lens.FormatValue(Displayed[^1].Value, lens, kind);
         }
     }
 
     private string HeadlineTitle => lens switch
     {
-        PriceLens.RealDollars => "Most recent, in today's dollars",
+        PriceLens.RealDollars when Lens.IsDollar(kind) => "Most recent, in today's dollars",
+        PriceLens.RealDollars => "Most recent, adjusted for inflation",
         PriceLens.TimePrice when Personalized => $"Most recent, {RateLabel}",
         PriceLens.TimePrice => "Most recent, average non-executive worker",
-        _ => "Most recent national average"
+        _ => "Most recent"
     };
 
     private string HeadlineSubtitle
@@ -178,6 +209,55 @@ else
             return lens == PriceLens.TimePrice && latestNominal is { } price
                 ? $"{price:C2} · {when}"
                 : when;
+        }
+    }
+
+    // "Then → now" story across the selected range, phrased for the active lens.
+    private string? ComparativeText
+    {
+        get
+        {
+            var pts = Filtered;
+            if (pts.Count < 2)
+            {
+                return null;
+            }
+
+            var first = pts[0];
+            var last = pts[^1];
+            var firstYear = first.Date.Year;
+            var lastYear = last.Date.Year;
+            if (firstYear == lastYear)
+            {
+                return null; // range too short to be interesting
+            }
+
+            if (lens == PriceLens.TimePrice)
+            {
+                if (first.Value <= 0 || last.Value <= 0)
+                {
+                    return null;
+                }
+
+                var fw = Lens.FormatWorkTime(first.Value);
+                var lw = Lens.FormatWorkTime(last.Value);
+                return last.Value < first.Value
+                    ? $"{fw} in {firstYear} → {lw} today — an hour of work buys {first.Value / last.Value:0.0}× more."
+                    : $"{fw} in {firstYear} → {lw} today — it costs {last.Value / first.Value:0.0}× more of your time.";
+            }
+
+            if (first.Value == 0)
+            {
+                return null;
+            }
+
+            var f = Lens.FormatValue(first.Value, lens, kind);
+            var l = Lens.FormatValue(last.Value, lens, kind);
+            var ratio = last.Value / first.Value;
+            var change = ratio >= 1
+                ? $"{ratio:0.0}× {(lens == PriceLens.RealDollars ? "in real terms" : "higher")}"
+                : $"down to {ratio * 100:0}% of the {firstYear} level";
+            return $"{f} in {firstYear} → {l} today — {change}.";
         }
     }
 
@@ -195,21 +275,25 @@ else
 
     private string? LensHelp => lens switch
     {
-        PriceLens.RealDollars => "Past prices restated in today's dollars using CPI, so amounts compare like-for-like.",
-        PriceLens.TimePrice => "How long you'd work to afford it, at average non-executive pay — enter your pay to personalize.",
+        PriceLens.RealDollars when Lens.IsDollar(kind) =>
+            "Past prices restated in today's dollars using CPI, so amounts compare like-for-like.",
+        PriceLens.RealDollars =>
+            "The index restated against overall inflation (CPI) — rising means it outpaced inflation, flat means it kept pace.",
+        PriceLens.TimePrice =>
+            "How long you'd work to afford it, at average non-executive pay — enter your pay to personalize.",
         _ => null
     };
 
-    private void OnLensChanged() => options = BuildOptions(lens);
+    private void OnLensChanged() => options = BuildOptions(lens, kind);
 
-    private static ApexChartOptions<LensPoint> BuildOptions(PriceLens l) => new()
+    private static ApexChartOptions<LensPoint> BuildOptions(PriceLens l, SeriesKind k) => new()
     {
         Chart = new Chart { Toolbar = new Toolbar { Show = false } },
         Stroke = new Stroke { Curve = Curve.Straight, Width = 2 },
         Xaxis = new XAxis { Type = XAxisType.Datetime },
         Yaxis = new List<YAxis>
         {
-            new YAxis { Labels = new YAxisLabels { Formatter = Lens.AxisFormatter(l) } }
+            new YAxis { Labels = new YAxisLabels { Formatter = Lens.AxisFormatter(l, k) } }
         },
         Tooltip = new ApexCharts.Tooltip { X = new TooltipX { Format = "MMM yyyy" } }
     };
@@ -231,23 +315,41 @@ else
         {
             var catalog = await Prices.GetSeriesAsync();
             series = catalog.FirstOrDefault(s => s.Id == Id);
+            kind = series?.Kind ?? SeriesKind.Price;
+            available = Lens.LensesFor(kind);
+            if (!available.Contains(lens))
+            {
+                lens = PriceLens.Nominal;
+            }
 
             var nominal = await Prices.GetObservationsAsync(Id);
-            var cpi = await Prices.GetObservationsAsync(Lens.CpiSeriesId);
-            var wages = await Prices.GetObservationsAsync(Lens.WageSeriesId);
 
-            projections = new()
+            var proj = new Dictionary<PriceLens, IReadOnlyList<LensPoint>>
             {
-                [PriceLens.Nominal] = Lens.Apply(PriceLens.Nominal, nominal, null),
-                [PriceLens.RealDollars] = Lens.Apply(PriceLens.RealDollars, nominal, cpi),
-                [PriceLens.TimePrice] = Lens.Apply(PriceLens.TimePrice, nominal, wages)
+                [PriceLens.Nominal] = Lens.Apply(PriceLens.Nominal, nominal, null)
             };
 
-            var lastNominal = projections[PriceLens.Nominal].LastOrDefault();
+            if (available.Contains(PriceLens.RealDollars))
+            {
+                var cpi = await Prices.GetObservationsAsync(Lens.CpiSeriesId);
+                proj[PriceLens.RealDollars] = Lens.Apply(PriceLens.RealDollars, nominal, cpi);
+                baseMonth = Lens.BaseMonth(cpi);
+            }
+
+            if (available.Contains(PriceLens.TimePrice))
+            {
+                var wages = await Prices.GetObservationsAsync(Lens.WageSeriesId);
+                proj[PriceLens.TimePrice] = Lens.Apply(PriceLens.TimePrice, nominal, wages);
+                averageWage = wages.Where(o => o.Value is not null).LastOrDefault()?.Value;
+            }
+
+            projections = proj;
+
+            var lastNominal = proj[PriceLens.Nominal].LastOrDefault();
             latestNominal = lastNominal?.Value;
             latestNominalDate = lastNominal?.Date;
-            averageWage = wages.Where(o => o.Value is not null).LastOrDefault()?.Value;
-            baseMonth = Lens.BaseMonth(cpi);
+
+            options = BuildOptions(lens, kind);
         }
         catch (Exception ex)
         {

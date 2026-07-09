@@ -19,7 +19,8 @@ public class PriceService
         // Reference series (CPI, wages) power the lenses but are not consumer goods, so keep them out of the catalog.
         return await _db.Series
             .Where(s => !s.IsReference)
-            .OrderBy(s => s.Name)
+            .OrderBy(s => s.Category)
+            .ThenBy(s => s.Name)
             .ToListAsync(ct);
     }
 

@@ -66,6 +66,48 @@
     color: white;
 }
 
+.nav-group-title {
+    cursor: pointer;
+    color: rgba(255, 255, 255, 0.55);
+    letter-spacing: 0.04em;
+    list-style: none;
+    user-select: none;
+}
+
+.nav-group-title:hover {
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.nav-group-title::-webkit-details-marker {
+    display: none;
+}
+
+.nav-group-title::before {
+    content: "\25B8"; /* ▸ */
+    display: inline-block;
+    width: 1rem;
+    font-size: 0.75rem;
+    transition: transform 0.15s ease;
+}
+
+.nav-group[open] > .nav-group-title::before {
+    transform: rotate(90deg);
+}
+
+/* Tighten spacing now that items are grouped. */
+.nav-group .nav-item:first-of-type {
+    padding-top: 0.25rem;
+}
+
+.nav-group .nav-item:last-of-type {
+    padding-bottom: 0.75rem;
+}
+
+.nav-group .nav-item ::deep .nav-link {
+    height: 2.5rem;
+    line-height: 2.5rem;
+}
+
 .nav-scrollable {
     display: none;
 }

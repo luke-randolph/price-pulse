@@ -6,9 +6,10 @@
 <PageTitle>Dashboard</PageTitle>
 
 <div class="dashboard">
-    <h1>Dashboard</h1>
-    <p class="text-muted">U.S. national average prices, updated monthly from the Bureau of Labor Statistics via FRED.
-    </p>
+        <h1>Dashboard</h1>
+        <p class="text-muted">U.S. national average prices, updated monthly from the Bureau of Labor Statistics via
+            FRED.
+        </p>
 
     @if (error is not null)
     {
@@ -20,44 +21,52 @@
     }
     else
     {
-        <div class="row g-3">
-            @foreach (var card in cards)
-            {
-                <div class="col-12 col-sm-6 col-lg-4">
-                    <a href="@($"series/{card.Series.Id}")" class="text-reset text-decoration-none">
-                        <RadzenCard class="h-100 dashboard-card">
-                            <div class="d-flex justify-content-between align-items-start mb-2">
-                                <div>
-                                    <div class="fw-semibold">@card.Series.Name</div>
-                                    <div class="text-primary small">@card.Series.Units</div>
-                                </div>
-                                <SeriesIcon Icon="@card.Series.Icon" />
-                            </div>
+    <div class="dashboard-categories">
+        @foreach (var group in cards.GroupBy(c => c.Series.Category))
+        {
+            <section class="dashboard-category">
+                <h2 class="h5 mb-3">@group.Key.Label()</h2>
+                <div class="row g-3">
+                    @foreach (var card in group)
+                    {
+                        <div class="col-12 col-sm-6 col-lg-4">
+                            <a href="@($"series/{card.Series.Id}")" class="text-reset text-decoration-none">
+                                <RadzenCard class="h-100 dashboard-card">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <div>
+                                            <div class="fw-semibold">@card.Series.Name</div>
+                                            <div class="text-primary small">@card.Series.Units</div>
+                                        </div>
+                                        <SeriesIcon Icon="@card.Series.Icon" />
+                                    </div>
 
-                            <div class="d-flex align-items-baseline justify-content-between mb-2">
-                                <span style="font-size: 1.6rem; font-weight: 600;">
-                                    @(card.Latest?.ToString("C2") ?? "—")
-                                </span>
-                                @if (card.YoyPercent is not null)
-                                {
-                                    <span class="small @(card.YoyPercent >= 0 ? "text-danger" : "text-success")">
-                                        @(card.YoyPercent >= 0 ? "▲" : "▼") @Math.Abs(card.YoyPercent.Value).ToString("0.0")%
-                                        <span class="text-muted">vs 1 yr ago</span>
-                                    </span>
-                                }
-                            </div>
+                                    <div class="d-flex align-items-baseline justify-content-between mb-2">
+                                        <span style="font-size: 1.6rem; font-weight: 600;">
+                                            @(card.Latest is { } v ? Lens.FormatValue(v, PriceLens.Nominal, card.Series.Kind) : "—")
+                                        </span>
+                                        @if (card.YoyPercent is not null)
+                                        {
+                                            <span class="small @(card.YoyPercent >= 0 ? "text-danger" : "text-success")">
+                                                @(card.YoyPercent >= 0 ? "▲" : "▼") @Math.Abs(card.YoyPercent.Value).ToString("0.0")%
+                                                <span class="text-muted">vs 1 yr ago</span>
+                                            </span>
+                                        }
+                                    </div>
 
-                            @if (card.Spark.Count > 0)
-                            {
-                                <ApexChart TItem="SparkPoint" Height="48" Options="@card.SparkOptions">
-                                    <ApexPointSeries TItem="SparkPoint" Items="@card.Spark" XValue="@(p => p.Date)"
-                                                     YValue="@(p => p.Value)" SeriesType="SeriesType.Line" />
-                                </ApexChart>
-                            }
-                        </RadzenCard>
-                    </a>
+                                    @if (card.Spark.Count > 0)
+                                    {
+                                        <ApexChart TItem="SparkPoint" Height="48" Options="@card.SparkOptions">
+                                            <ApexPointSeries TItem="SparkPoint" Items="@card.Spark" XValue="@(p => p.Date)"
+                                                             YValue="@(p => p.Value)" SeriesType="SeriesType.Line" />
+                                        </ApexChart>
+                                    }
+                                </RadzenCard>
+                            </a>
+                        </div>
+                    }
                 </div>
-            }
+            </section>
+        }
         </div>
     }
 </div>
