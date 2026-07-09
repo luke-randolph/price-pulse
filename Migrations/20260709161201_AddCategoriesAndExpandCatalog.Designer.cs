@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using PricePulse.Data;
 
@@ -10,9 +11,11 @@ using PricePulse.Data;
 namespace PricePulse.Migrations
 {
     [DbContext(typeof(PriceContext))]
-    partial class PriceContextModelSnapshot : ModelSnapshot
+    [Migration("20260709161201_AddCategoriesAndExpandCatalog")]
+    partial class AddCategoriesAndExpandCatalog
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.6");
@@ -86,7 +89,7 @@ namespace PricePulse.Migrations
                         {
                             Id = "APU0000709112",
                             Category = 0,
-                            Icon = "lucide:milk",
+                            Icon = "svg:milk",
                             IsReference = false,
                             Kind = 0,
                             Name = "Milk",
@@ -116,7 +119,7 @@ namespace PricePulse.Migrations
                         {
                             Id = "APU0000706111",
                             Category = 0,
-                            Icon = "lucide:drumstick",
+                            Icon = "set_meal",
                             IsReference = false,
                             Kind = 0,
                             Name = "Chicken",
@@ -136,7 +139,7 @@ namespace PricePulse.Migrations
                         {
                             Id = "APU0000711211",
                             Category = 0,
-                            Icon = "lucide:banana",
+                            Icon = "nutrition",
                             IsReference = false,
                             Kind = 0,
                             Name = "Bananas",
@@ -200,7 +203,7 @@ namespace PricePulse.Migrations
                             IsReference = false,
                             Kind = 1,
                             Name = "Rent",
-                            Units = "price index"
+                            Units = "index (1982-84=100)"
                         },
                         new
                         {
@@ -210,7 +213,7 @@ namespace PricePulse.Migrations
                             IsReference = false,
                             Kind = 1,
                             Name = "Tuition",
-                            Units = "price index"
+                            Units = "index (1982-84=100)"
                         },
                         new
                         {
@@ -220,7 +223,7 @@ namespace PricePulse.Migrations
                             IsReference = false,
                             Kind = 1,
                             Name = "Medical Care",
-                            Units = "price index"
+                            Units = "index (1982-84=100)"
                         },
                         new
                         {
@@ -230,7 +233,7 @@ namespace PricePulse.Migrations
                             IsReference = false,
                             Kind = 1,
                             Name = "Clothing",
-                            Units = "price index"
+                            Units = "index (1982-84=100)"
                         },
                         new
                         {
@@ -240,7 +243,7 @@ namespace PricePulse.Migrations
                             IsReference = false,
                             Kind = 1,
                             Name = "Toys",
-                            Units = "price index"
+                            Units = "index (1982-84=100)"
                         },
                         new
                         {
@@ -250,7 +253,7 @@ namespace PricePulse.Migrations
                             IsReference = false,
                             Kind = 1,
                             Name = "Electronics",
-                            Units = "price index"
+                            Units = "index (Dec 2024=100)"
                         },
                         new
                         {
@@ -270,7 +273,7 @@ namespace PricePulse.Migrations
                             IsReference = false,
                             Kind = 3,
                             Name = "Productivity",
-                            Units = "output per hour"
+                            Units = "output/hour · index (2017=100)"
                         },
                         new
                         {
@@ -280,7 +283,7 @@ namespace PricePulse.Migrations
                             IsReference = true,
                             Kind = 1,
                             Name = "Consumer Price Index",
-                            Units = "price index"
+                            Units = "index (1982-84=100)"
                         });
                 });
 

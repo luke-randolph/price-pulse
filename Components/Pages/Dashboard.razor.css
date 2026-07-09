@@ -4,6 +4,10 @@
     vertical-align: middle;
 }
 
+.dashboard-category + .dashboard-category {
+    margin-top: 3rem;
+}
+
 .dashboard ::deep .dashboard-card {
     cursor: pointer;
     transition: box-shadow 0.15s ease-in-out;

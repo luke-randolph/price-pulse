@@ -2,7 +2,7 @@ namespace PricePulse.Data;
 
 public enum PriceLens
 {
-    Nominal,      // raw dollars, as reported
+    Nominal,      // raw value, as reported
     RealDollars,  // inflation-adjusted to the latest month ("today's dollars")
     TimePrice     // price ÷ average hourly wage = hours of work
 }
@@ -13,6 +13,21 @@ public static class Lens
 {
     public const string CpiSeriesId = "CPIAUCNS";        // CPI-U, not seasonally adjusted
     public const string WageSeriesId = "CEU0500000008";  // production & nonsupervisory wage, NSA, back to 1964
+
+    private const decimal HoursPerWorkWeek = 40m;
+    private const decimal HoursPerWorkYear = 2080m;      // 40 hr × 52 wk
+
+    public static IReadOnlyList<PriceLens> LensesFor(SeriesKind kind) => kind switch
+    {
+        SeriesKind.Price => new[] { PriceLens.Nominal, PriceLens.RealDollars, PriceLens.TimePrice },
+        SeriesKind.PriceIndex => new[] { PriceLens.Nominal, PriceLens.RealDollars },
+        SeriesKind.Wage => new[] { PriceLens.Nominal, PriceLens.RealDollars },
+        SeriesKind.Indicator => new[] { PriceLens.Nominal },
+        _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null)
+    };
+
+    // Dollar-valued kinds format as currency; index kinds as a plain number.
+    public static bool IsDollar(SeriesKind kind) => kind is SeriesKind.Price or SeriesKind.Wage;
 
     public static string? ReferenceSeriesId(PriceLens lens) => lens switch
     {
@@ -82,23 +97,38 @@ public static class Lens
             .OrderBy(o => o.Date)
             .LastOrDefault()?.Date.ToDateTime(TimeOnly.MinValue);
 
-    public static string Format(decimal value, PriceLens lens) => lens switch
+    // Formats a lens value for display, honouring the series' unit kind.
+    public static string FormatValue(decimal value, PriceLens lens, SeriesKind kind) => lens switch
     {
         PriceLens.TimePrice => FormatWorkTime(value),
-        _ => value.ToString("C2")
+        _ when IsDollar(kind) => FormatDollars(value),
+        _ => value.ToString("N1")  // index number
     };
 
-    // Natural unit for hours of work: minutes / hours / 40-hour weeks.
+    // Big-ticket dollars (homes, wages × year) read better without cents.
+    public static string FormatDollars(decimal value) =>
+        Math.Abs(value) >= 1000m ? value.ToString("C0") : value.ToString("C2");
+
+    // Natural unit for hours of work: minutes / hours / weeks / years.
     public static string FormatWorkTime(decimal hours)
     {
         var minutes = hours * 60m;
         if (minutes < 60m) return $"{minutes:0} min";
-        if (hours < 40m) return $"{hours:0.0} hr";
-        return $"{hours / 40m:0.0} wk";
+        if (hours < HoursPerWorkWeek) return $"{hours:0.0} hr";
+        if (hours < HoursPerWorkYear) return $"{hours / HoursPerWorkWeek:0.0} wk";
+        return $"{hours / HoursPerWorkYear:0.0} yr";
     }
 
-    // JS Y-axis formatter, mirroring FormatWorkTime for the chart ticks (renders browser-side).
-    public static string AxisFormatter(PriceLens lens) => lens == PriceLens.TimePrice
-        ? "function (val) { var m = val * 60; if (m < 60) return m.toFixed(0) + ' min'; if (val < 40) return val.toFixed(1) + ' hr'; return (val / 40).toFixed(1) + ' wk'; }"
-        : "function (val) { return '$' + val.toFixed(2); }";
+    // JS Y-axis formatter, mirroring the C# formatters for the chart ticks (renders browser-side).
+    public static string AxisFormatter(PriceLens lens, SeriesKind kind)
+    {
+        if (lens == PriceLens.TimePrice)
+        {
+            return "function (val) { var m = val * 60; if (m < 60) return m.toFixed(0) + ' min'; if (val < 40) return val.toFixed(1) + ' hr'; if (val < 2080) return (val / 40).toFixed(1) + ' wk'; return (val / 2080).toFixed(1) + ' yr'; }";
+        }
+
+        return IsDollar(kind)
+            ? "function (val) { return val >= 1000 ? '$' + Math.round(val).toLocaleString() : '$' + val.toFixed(2); }"
+            : "function (val) { return val.toFixed(1); }";
+    }
 }

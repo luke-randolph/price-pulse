@@ -20,9 +20,13 @@
     }
     else
     {
-        <div class="row g-3">
-            @foreach (var card in cards)
-            {
+        @foreach (var group in cards.GroupBy(c => c.Series.Category))
+        {
+            <section class="dashboard-category">
+                <h2 class="h5 text-muted mb-3">@group.Key.Label()</h2>
+                <div class="row g-3">
+                    @foreach (var card in group)
+                    {
                 <div class="col-12 col-sm-6 col-lg-4">
                     <a href="@($"series/{card.Series.Id}")" class="text-reset text-decoration-none">
                         <RadzenCard class="h-100 dashboard-card">
@@ -36,7 +40,7 @@
 
                             <div class="d-flex align-items-baseline justify-content-between mb-2">
                                 <span style="font-size: 1.6rem; font-weight: 600;">
-                                    @(card.Latest?.ToString("C2") ?? "—")
+                                    @(card.Latest is { } v ? Lens.FormatValue(v, PriceLens.Nominal, card.Series.Kind) : "—")
                                 </span>
                                 @if (card.YoyPercent is not null)
                                 {
@@ -57,8 +61,10 @@
                         </RadzenCard>
                     </a>
                 </div>
-            }
-        </div>
+                    }
+                </div>
+            </section>
+        }
     }
 </div>
 
