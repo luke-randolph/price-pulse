@@ -20,7 +20,7 @@ namespace PricePulse.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.6");
 
-            modelBuilder.Entity("PricePulse.Data.Observation", b =>
+            modelBuilder.Entity("PricePulse.Models.Observation", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -44,7 +44,7 @@ namespace PricePulse.Migrations
                     b.ToTable("Observations");
                 });
 
-            modelBuilder.Entity("PricePulse.Data.Series", b =>
+            modelBuilder.Entity("PricePulse.Models.Series", b =>
                 {
                     b.Property<string>("Id")
                         .HasColumnType("TEXT");
@@ -100,9 +100,9 @@ namespace PricePulse.Migrations
                         });
                 });
 
-            modelBuilder.Entity("PricePulse.Data.Observation", b =>
+            modelBuilder.Entity("PricePulse.Models.Observation", b =>
                 {
-                    b.HasOne("PricePulse.Data.Series", "Series")
+                    b.HasOne("PricePulse.Models.Series", "Series")
                         .WithMany("Observations")
                         .HasForeignKey("SeriesId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -111,7 +111,7 @@ namespace PricePulse.Migrations
                     b.Navigation("Series");
                 });
 
-            modelBuilder.Entity("PricePulse.Data.Series", b =>
+            modelBuilder.Entity("PricePulse.Models.Series", b =>
                 {
                     b.Navigation("Observations");
                 });

@@ -1,4 +1,4 @@
-namespace PricePulse.Data;
+namespace PricePulse.Models;
 
 public class Observation
 {

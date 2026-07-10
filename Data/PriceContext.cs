@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using PricePulse.Models;
 
 namespace PricePulse.Data;
 
