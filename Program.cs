@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using PricePulse.Components;
 using PricePulse.Data;
+using PricePulse.Services;
 using PricePulse.Fred;
 using ApexCharts;
 using Radzen;

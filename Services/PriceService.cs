@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
+using PricePulse.Data;
+using PricePulse.Models;
 using PricePulse.Fred;
 
-namespace PricePulse.Data;
+namespace PricePulse.Services;
 
 public class PriceService
 {

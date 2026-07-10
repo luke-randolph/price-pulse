@@ -1,4 +1,6 @@
-namespace PricePulse.Data;
+using PricePulse.Models;
+
+namespace PricePulse.Pricing;
 
 public enum PriceLens
 {
