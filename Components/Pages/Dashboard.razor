@@ -86,16 +86,16 @@
         Xaxis = new XAxis { Type = XAxisType.Datetime }
     };
 
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
         try
         {
-            var catalog = await Prices.GetSeriesAsync();
+            var catalog = Prices.GetSeries();
             var result = new List<SeriesCard>();
 
             foreach (var s in catalog)
             {
-                var priced = (await Prices.GetObservationsAsync(s.Id))
+                var priced = Prices.GetObservations(s.Id)
                     .Where(o => o.Value is not null)
                     .Select(o => new SparkPoint(o.Date.ToDateTime(TimeOnly.MinValue), o.Value!.Value))
                     .ToList();

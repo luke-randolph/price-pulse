@@ -306,7 +306,7 @@ else
         Tooltip = new ApexCharts.Tooltip { X = new TooltipX { Format = "MMM yyyy" } }
     };
 
-    protected override async Task OnParametersSetAsync()
+    protected override void OnParametersSet()
     {
         if (Id == loadedId)
         {
@@ -321,7 +321,7 @@ else
 
         try
         {
-            var catalog = await Prices.GetSeriesAsync();
+            var catalog = Prices.GetSeries();
             series = catalog.FirstOrDefault(s => s.Id == Id);
             kind = series?.Kind ?? SeriesKind.Price;
             available = Lens.LensesFor(kind);
@@ -330,7 +330,7 @@ else
                 lens = PriceLens.Nominal;
             }
 
-            var nominal = await Prices.GetObservationsAsync(Id);
+            var nominal = Prices.GetObservations(Id);
 
             var proj = new Dictionary<PriceLens, IReadOnlyList<LensPoint>>
             {
@@ -339,14 +339,14 @@ else
 
             if (available.Contains(PriceLens.RealDollars))
             {
-                var cpi = await Prices.GetObservationsAsync(Lens.CpiSeriesId);
+                var cpi = Prices.GetObservations(Lens.CpiSeriesId);
                 proj[PriceLens.RealDollars] = Lens.Apply(PriceLens.RealDollars, nominal, cpi);
                 baseMonth = Lens.BaseMonth(cpi);
             }
 
             if (available.Contains(PriceLens.TimePrice))
             {
-                var wages = await Prices.GetObservationsAsync(Lens.WageSeriesId);
+                var wages = Prices.GetObservations(Lens.WageSeriesId);
                 proj[PriceLens.TimePrice] = Lens.Apply(PriceLens.TimePrice, nominal, wages);
                 averageWage = wages.Where(o => o.Value is not null).LastOrDefault()?.Value;
             }

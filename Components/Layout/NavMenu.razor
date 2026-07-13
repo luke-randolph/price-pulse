@@ -38,8 +38,8 @@
 @code {
     private IReadOnlyList<Series>? series;
 
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
-        series = await Prices.GetSeriesAsync();
+        series = Prices.GetSeries();
     }
 }
