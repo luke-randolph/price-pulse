@@ -1,6 +1,4 @@
-using Microsoft.EntityFrameworkCore;
 using PricePulse.Components;
-using PricePulse.Data;
 using PricePulse.Services;
 using PricePulse.Fred;
 using ApexCharts;
@@ -8,7 +6,6 @@ using Radzen;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
@@ -17,11 +14,13 @@ builder.Services.AddHttpClient<FredClient>(client =>
     client.BaseAddress = new Uri("https://api.stlouisfed.org/");
 });
 
-builder.Services.AddDbContext<PriceContext>(options =>
-    options.UseSqlite(builder.Configuration.GetConnectionString("PriceDb")
-        ?? "Data Source=pricepulse.db"));
-
+// Price data is a small, read-mostly mirror of FRED, so it lives in memory rather than a database:
+// FredDataLoader warms PriceStore at startup and DataSyncService refreshes it on a timer. FRED is
+// the source of truth, so there is nothing to persist.
+builder.Services.AddSingleton<PriceStore>();
+builder.Services.AddScoped<FredDataLoader>();
 builder.Services.AddScoped<PriceService>();
+builder.Services.AddHostedService<DataSyncService>();
 
 builder.Services.AddRadzenComponents();
 
@@ -29,14 +28,22 @@ builder.Services.AddApexCharts();
 
 var app = builder.Build();
 
-// Apply any pending migrations and create the database file on startup.
+// Warm the cache before serving so the first request is instant. Best-effort: a missing API key or
+// a FRED outage must not stop the app from starting — the background refresher will retry.
 using (var scope = app.Services.CreateScope())
 {
-    var db = scope.ServiceProvider.GetRequiredService<PriceContext>();
-    db.Database.Migrate();
+    var loader = scope.ServiceProvider.GetRequiredService<FredDataLoader>();
+    try
+    {
+        var total = await loader.RefreshAsync();
+        app.Logger.LogInformation("Price cache warmed: {Total} observations.", total);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Initial price load failed; starting with an empty cache.");
+    }
 }
 
-// Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);

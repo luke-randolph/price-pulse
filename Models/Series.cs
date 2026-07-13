@@ -29,10 +29,8 @@ public class Series
     public SeriesCategory Category { get; set; }
     public SeriesKind Kind { get; set; }
 
-    // Reference series are fetched and stored like any other series but hidden from the consumer catalog.
+    // Reference series are fetched like any other series but hidden from the consumer catalog.
     public bool IsReference { get; set; }
-
-    public List<Observation> Observations { get; set; } = new();
 }
 
 public static class SeriesCategories
