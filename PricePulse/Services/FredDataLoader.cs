@@ -59,6 +59,6 @@ public class FredDataLoader
         }
 
         _store.Replace(snapshot);
-        return snapshot.Values.Sum(o => o.Count);
+        return snapshot.Values.Sum(list => list.Count);
     }
 }

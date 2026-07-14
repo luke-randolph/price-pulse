@@ -23,4 +23,8 @@ public class PriceService
 
     public IReadOnlyList<Observation> GetObservations(string seriesId) =>
         _store.GetObservations(seriesId);
+
+    // False only when the startup warm-up hasn't populated the cache yet (e.g. FRED was
+    // unavailable). Pages use it to show a "loading" state instead of a wall of empty values.
+    public bool IsWarm => _store.IsWarm;
 }

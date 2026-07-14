@@ -1,12 +1,13 @@
 @page "/series/{Id}"
 @inject PriceService Prices
+@inject ILogger<SeriesDetail> Logger
 @rendermode InteractiveServer
 
 <PageTitle>@(series?.Name ?? "Series")</PageTitle>
 
-@if (error is not null)
+@if (failed)
 {
-    <p class="text-danger">Error: @error</p>
+    <p class="text-muted">Something went wrong loading this series. Please try again shortly.</p>
 }
 else if (projections is null)
 {
@@ -132,7 +133,7 @@ else
     private DateTime? latestNominalDate;
     private decimal? averageWage;
     private DateTime? baseMonth;
-    private string? error;
+    private bool failed;
     private string? loadedId;
 
     private int rangeYears = 10;
@@ -191,7 +192,7 @@ else
 
     private string HeadlineTitle => lens switch
     {
-        PriceLens.RealDollars when Lens.IsDollar(kind) => "Most recent, in today's dollars",
+        PriceLens.RealDollars when Lens.IsDollar(kind) => $"Most recent, in {BaseMonthLabel} dollars",
         PriceLens.RealDollars => "Most recent, adjusted for inflation",
         PriceLens.TimePrice when Personalized => $"Most recent, {RateLabel}",
         PriceLens.TimePrice => "Most recent, average non-executive worker",
@@ -272,10 +273,13 @@ else
         }
     }
 
+    // The period real-dollar values are expressed in: the latest CPI month, i.e. "today's dollars".
+    private string BaseMonthLabel => baseMonth?.ToString("MMMM yyyy") ?? "today's";
+
     private string? LensHelp => lens switch
     {
         PriceLens.RealDollars when Lens.IsDollar(kind) =>
-            "Past prices restated in today's dollars using CPI, so amounts compare like-for-like.",
+            $"Past prices restated in {BaseMonthLabel} dollars using CPI, so amounts compare like-for-like.",
         PriceLens.RealDollars =>
             "The index restated against overall inflation (CPI) — rising means it outpaced inflation, flat means it kept pace.",
         PriceLens.TimePrice =>
@@ -317,7 +321,8 @@ else
         series = null;
         projections = null;
         latestNominal = null;
-        error = null;
+        baseMonth = null;
+        failed = false;
 
         try
         {
@@ -361,7 +366,8 @@ else
         }
         catch (Exception ex)
         {
-            error = ex.Message;
+            Logger.LogError(ex, "Failed to load series {SeriesId}.", Id);
+            failed = true;
         }
     }
 }
