@@ -1,26 +1,10 @@
-using System.Globalization;
 using PricePulse.Models;
 using PricePulse.Pricing;
 
 namespace PricePulse.Tests;
 
-// Formatting uses the current culture (currency symbol, decimal/grouping separators), so pin en-US
-// to keep assertions deterministic across machines and CI runners. The original culture is restored
-// after each test so this pinning can't leak into other test classes on the same thread.
-public class LensFormattingTests : IDisposable
+public class LensFormattingTests
 {
-    private readonly CultureInfo _originalCulture = CultureInfo.CurrentCulture;
-
-    public LensFormattingTests()
-    {
-        CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("en-US");
-    }
-
-    public void Dispose()
-    {
-        CultureInfo.CurrentCulture = _originalCulture;
-    }
-
     [Theory]
     [InlineData(4.99, "$4.99")]     // under $1,000 keeps cents
     [InlineData(1000, "$1,000")]    // $1,000 and up drop cents

@@ -1,8 +1,15 @@
+using System.Globalization;
 using PricePulse.Components;
 using PricePulse.Services;
 using PricePulse.Fred;
 using ApexCharts;
 using Radzen;
+
+// Every figure in this app is U.S. dollars / U.S. number formatting, so pin en-US once here.
+// Otherwise formatting inherits the host's culture, which is the invariant culture inside a Linux
+var enUs = CultureInfo.GetCultureInfo("en-US");
+CultureInfo.DefaultThreadCurrentCulture = enUs;
+CultureInfo.DefaultThreadCurrentUICulture = enUs;
 
 var builder = WebApplication.CreateBuilder(args);
 
