@@ -1,5 +1,6 @@
 @page "/"
 @inject PriceService Prices
+@inject ILogger<Dashboard> Logger
 @rendermode InteractiveServer
 
 <PageTitle>Dashboard</PageTitle>
@@ -10,15 +11,15 @@
             FRED.
         </p>
 
-    @if (error is not null)
+    @if (failed)
     {
-        <p class="text-danger">Error: @error</p>
+        <p class="text-muted">Something went wrong loading prices. Please try again shortly.</p>
     }
-    else if (cards is null)
+    else if (!Prices.IsWarm)
     {
-        <p>Loading…</p>
+        <p class="text-muted">Prices are loading — check back in a moment.</p>
     }
-    else
+    else if (cards is not null)
     {
     <div class="dashboard-categories">
         @foreach (var group in cards.GroupBy(c => c.Series.Category))
@@ -72,12 +73,12 @@
 
 @code {
     private List<SeriesCard>? cards;
-    private string? error;
+    private bool failed;
 
-    // Each chart needs its own options instance — ApexCharts writes per-chart state into it.
     // Mirrors --primary in wwwroot/app.css.
     private const string BrandPrimary = "#4f46e5";
 
+    // Each chart needs its own options instance — ApexCharts writes per-chart state into it.
     private static ApexChartOptions<SparkPoint> MakeSparkOptions() => new()
     {
         Chart = new Chart { Sparkline = new ChartSparkline { Enabled = true } },
@@ -125,7 +126,8 @@
         }
         catch (Exception ex)
         {
-            error = ex.Message;
+            Logger.LogError(ex, "Failed to build the dashboard.");
+            failed = true;
         }
     }
 

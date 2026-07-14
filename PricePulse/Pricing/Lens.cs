@@ -31,13 +31,6 @@ public static class Lens
     // Dollar-valued kinds format as currency; index kinds as a plain number.
     public static bool IsDollar(SeriesKind kind) => kind is SeriesKind.Price or SeriesKind.Wage;
 
-    public static string? ReferenceSeriesId(PriceLens lens) => lens switch
-    {
-        PriceLens.RealDollars => CpiSeriesId,
-        PriceLens.TimePrice => WageSeriesId,
-        _ => null
-    };
-
     // Projects observations through a lens. Derived lenses drop points that have no reference
     // value for their month. The time-price curve always uses the average-worker wage;
     // personalization is a separate point-in-time calc (TimePriceAt), never applied across history.

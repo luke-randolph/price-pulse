@@ -1,5 +1,7 @@
 # Price Pulse
 
+[![CI](https://github.com/luke-randolph/price-pulse/actions/workflows/ci.yml/badge.svg)](https://github.com/luke-randolph/price-pulse/actions/workflows/ci.yml)
+
 A .NET 9 Blazor web app that tracks U.S. consumer prices — groceries, energy, housing, healthcare, and more — using official data from [FRED](https://fred.stlouisfed.org/) (the St. Louis Fed's economic data service). Beyond the raw numbers, it reframes prices through three **lenses** so the data actually means something: today's dollars, and hours of work.
 
 > _Add a screenshot or two here — the dashboard and a series detail page make a strong first impression._
@@ -34,7 +36,7 @@ The price data is a small, read-mostly mirror of FRED (~20 series, a few MB), an
 
 The cache is **warmed at startup before the app accepts traffic**, so the first request is already fast. If the FRED key is missing or FRED is unavailable, the app starts anyway with an empty cache and the background service retries — startup is never blocked by an upstream outage.
 
-`Pricing/Lens.cs` holds the pure functions behind the lenses (CPI real-dollar adjustment, work-time conversion, and display formatting).
+`PricePulse/Pricing/Lens.cs` holds the pure functions behind the lenses (CPI real-dollar adjustment, work-time conversion, and display formatting) — which is also where the test suite is focused.
 
 ## Running locally
 
@@ -42,19 +44,27 @@ Requires the [.NET 9 SDK](https://dotnet.microsoft.com/download) and a free [FRE
 
 ```bash
 # Provide your FRED API key (stored outside source control via user-secrets)
-dotnet user-secrets set "Fred:ApiKey" "<your-key>"
+dotnet user-secrets set "Fred:ApiKey" "<your-key>" --project PricePulse
 
 # Run
-dotnet run
+dotnet run --project PricePulse
 ```
 
 Then open the URL shown in the console. On startup the app fetches the full history for each series into memory (a few seconds), after which every page serves instantly.
+
+## Tests
+
+```bash
+dotnet test
+```
+
+`PricePulse.Tests` covers the pricing logic in `PricePulse/Pricing/Lens.cs` — the CPI real-dollar adjustment, work-time conversion, month-matching of reference series, and display formatting. The same suite runs on every push and pull request via GitHub Actions (see the badge above).
 
 ## Configuration
 
 | Setting | How to set it | Notes |
 | --- | --- | --- |
-| `Fred:ApiKey` | `dotnet user-secrets set "Fred:ApiKey" "<key>"` (dev) or an environment variable / `Fred__ApiKey` (prod) | Required. The app will start without it but the cache stays empty until it's provided. |
+| `Fred:ApiKey` | `dotnet user-secrets set "Fred:ApiKey" "<key>" --project PricePulse` (dev) or an environment variable / `Fred__ApiKey` (prod) | Required. The app will start without it but the cache stays empty until it's provided. |
 
 ## Data source
 
