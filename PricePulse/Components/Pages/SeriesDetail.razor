@@ -87,6 +87,36 @@ else
                 {
                     <div class="text-muted small mt-2 fst-italic">@ComparativeText</div>
                 }
+                @if (InflationContext is not null)
+                {
+                    <div class="text-muted small mt-2">@InflationContext</div>
+                }
+            </RadzenCard>
+        }
+
+        @if (lens == PriceLens.Nominal && Displayed.Count > 1)
+        {
+            <RadzenCard class="mb-4" style="max-width: 34rem;">
+                <div class="text-muted small mb-2">@ChangeCardTitle</div>
+                <div class="d-flex flex-wrap gap-4">
+                    @foreach (var (years, label) in ChangeHorizons)
+                    {
+                        <div>
+                            <div class="text-muted small">@label</div>
+                            @if (ChangePercent(years) is { } pct)
+                            {
+                                <div class="@(pct >= 0 ? "text-danger" : "text-success")"
+                                     style="font-size: 1.15rem; font-weight: 600;">
+                                    @(pct >= 0 ? "▲" : "▼") @Math.Abs(pct).ToString("0.0")%
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="text-muted" style="font-size: 1.15rem;">—</div>
+                            }
+                        </div>
+                    }
+                </div>
             </RadzenCard>
         }
 
@@ -95,6 +125,7 @@ else
             <Items>
                 <RadzenSelectBarItem Text="Past year" Value="1" />
                 <RadzenSelectBarItem Text="Last 10 years" Value="10" />
+                <RadzenSelectBarItem Text="Last 25 years" Value="25" />
                 <RadzenSelectBarItem Text="Last 50 years" Value="50" />
             </Items>
         </RadzenSelectBar>
@@ -269,6 +300,63 @@ else
                 ? $"{ratio:0.0}× {(lens == PriceLens.RealDollars ? "in real terms" : "higher")}"
                 : $"down to {ratio * 100:0}% of the {firstYear} level";
             return $"{f} in {firstYear} → {l} today — {change}.";
+        }
+    }
+
+    private static readonly (int Years, string Label)[] ChangeHorizons =
+    {
+        (1, "1 year"), (2, "2 years"), (5, "5 years"), (10, "10 years")
+    };
+
+    private string ChangeCardTitle => Lens.IsDollar(kind) ? "Price change" : "Change";
+
+    private decimal? ChangePercent(int years)
+    {
+        var pts = Displayed;
+        if (pts.Count == 0)
+        {
+            return null;
+        }
+
+        var latest = pts[^1];
+        var then = pts.LastOrDefault(p => p.Date <= latest.Date.AddYears(-years));
+        if (then is null || then.Value == 0)
+        {
+            return null;
+        }
+
+        return (latest.Value - then.Value) / then.Value * 100m;
+    }
+
+    private string? InflationContext
+    {
+        get
+        {
+            if (lens != PriceLens.RealDollars || projections is null)
+            {
+                return null;
+            }
+
+            var real = Filtered;
+            if (real.Count < 2)
+            {
+                return null;
+            }
+
+            var firstDate = real[0].Date;
+            var nominalFirst = projections[PriceLens.Nominal].FirstOrDefault(p => p.Date == firstDate);
+            if (nominalFirst is null || nominalFirst.Value == 0)
+            {
+                return null;
+            }
+
+            // real = nominal × (baseCPI / cpiThen), so real ÷ nominal is CPI's growth to today.
+            var pct = (real[0].Value / nominalFirst.Value - 1) * 100m;
+            var fromYear = firstDate.Year;
+            var nowLabel = baseMonth?.Year.ToString() ?? "today";
+            return pct >= 0
+                ? $"Adjusted with the Consumer Price Index (CPI): overall U.S. prices rose {pct:0}% from {fromYear} to {nowLabel}."
+                : $"Adjusted with the Consumer Price Index (CPI): overall U.S. prices fell {Math.Abs(pct):0}% from {fromYear} to {nowLabel}.";
         }
     }
 
