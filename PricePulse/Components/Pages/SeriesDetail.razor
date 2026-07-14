@@ -20,7 +20,6 @@ else if (series is null)
 else
 {
     <h1>@series.Name</h1>
-    <p class="text-primary mb-1">@series.Units</p>
     @if (kind == SeriesKind.PriceIndex)
     {
         <p class="text-muted small mb-3" style="max-width: 40rem;">
@@ -82,6 +81,7 @@ else
             <RadzenCard class="mb-4" style="max-width: 26rem;">
                 <div class="text-muted">@HeadlineTitle</div>
                 <div style="font-size: 2rem; font-weight: 600;">@HeadlineValue</div>
+                <div class="text-primary small">@series.Units</div>
                 <div class="text-muted">@HeadlineSubtitle</div>
                 @if (ComparativeText is not null)
                 {
@@ -90,7 +90,8 @@ else
             </RadzenCard>
         }
 
-        <RadzenSelectBar @bind-Value="rangeYears" TValue="int" Size="ButtonSize.Small" class="mb-3">
+        <RadzenSelectBar @bind-Value="rangeYears" @bind-Value:after="ArmChartLoading" TValue="int" Size="ButtonSize.Small"
+                         class="mb-3">
             <Items>
                 <RadzenSelectBarItem Text="Past year" Value="1" />
                 <RadzenSelectBarItem Text="Last 10 years" Value="10" />
@@ -100,10 +101,19 @@ else
 
         @if (Filtered.Count > 0)
         {
-            <ApexChart TItem="LensPoint" @key="@($"{rangeYears}-{lens}")" Height="400" Options="@options">
-                <ApexPointSeries TItem="LensPoint" Items="@Filtered" Name="@series.Name" XValue="@(p => p.Date)"
-                                 YValue="@(p => p.Value)" SeriesType="SeriesType.Line" />
-            </ApexChart>
+            <div class="chart-wrap">
+                @if (chartRendering)
+                {
+                    <div class="chart-loading">
+                        <div class="chart-spinner" role="status" aria-label="Loading chart"></div>
+                    </div>
+                }
+                <ApexChart TItem="LensPoint" @key="@($"{rangeYears}-{lens}")" Height="400" Options="@options"
+                           OnRendered="OnChartRendered">
+                    <ApexPointSeries TItem="LensPoint" Items="@Filtered" Name="@series.Name" XValue="@(p => p.Date)"
+                                     YValue="@(p => p.Value)" SeriesType="SeriesType.Line" />
+                </ApexChart>
+            </div>
         }
         else
         {
@@ -140,10 +150,11 @@ else
     private PriceLens lens = PriceLens.Nominal;
     private decimal? customRate;
     private bool rateIsSalary;
+    private bool chartRendering = true;
 
     private const decimal HoursPerWorkYear = 2080m;
 
-    private ApexChartOptions<LensPoint> options = BuildOptions(PriceLens.Nominal, SeriesKind.Price);
+    private ApexChartOptions<LensPoint> options = BuildOptions(PriceLens.Nominal, SeriesKind.Price, "");
 
     private IReadOnlyList<LensPoint> Displayed =>
         projections is not null && projections.TryGetValue(lens, out var pts) ? pts : Array.Empty<LensPoint>();
@@ -287,17 +298,33 @@ else
         _ => null
     };
 
-    private void OnLensChanged() => options = BuildOptions(lens, kind);
+    private void OnLensChanged()
+    {
+        options = BuildOptions(lens, kind, series?.Units ?? "");
+        ArmChartLoading();
+    }
+
+    // A lens/range change recreates the chart via @key, so show the spinner until OnRendered fires.
+    private void ArmChartLoading() => chartRendering = true;
+
+    private void OnChartRendered()
+    {
+        if (chartRendering)
+        {
+            chartRendering = false;
+            StateHasChanged();
+        }
+    }
 
     // Mirror the palette in wwwroot/app.css; the line takes on the active lens's color.
     private static string LensColor(PriceLens l) => l switch
     {
         PriceLens.RealDollars => "#3949ab", // --blue
-        PriceLens.TimePrice => "#7c3aed",   // --purple
+        PriceLens.TimePrice => "#7c3aed", // --purple
         _ => "#4f46e5"                       // --indigo (--primary)
     };
 
-    private static ApexChartOptions<LensPoint> BuildOptions(PriceLens l, SeriesKind k) => new()
+    private static ApexChartOptions<LensPoint> BuildOptions(PriceLens l, SeriesKind k, string units) => new()
     {
         Chart = new Chart { Toolbar = new Toolbar { Show = false } },
         Colors = new List<string> { LensColor(l) },
@@ -305,9 +332,22 @@ else
         Xaxis = new XAxis { Type = XAxisType.Datetime },
         Yaxis = new List<YAxis>
         {
-            new YAxis { Labels = new YAxisLabels { Formatter = Lens.AxisFormatter(l, k) } }
+            new YAxis
+            {
+                Labels = new YAxisLabels { Formatter = Lens.AxisFormatter(l, k) },
+                Title = new AxisTitle
+                {
+                    Text = Lens.AxisTitle(l, k, units),
+                    OffsetX = -6,
+                    Style = new AxisTitleStyle { FontSize = "14px" }
+                }
+            }
         },
-        Tooltip = new ApexCharts.Tooltip { X = new TooltipX { Format = "MMM yyyy" } }
+        Tooltip = new ApexCharts.Tooltip
+        {
+            X = new TooltipX { Format = "MMM yyyy" },
+            Y = new TooltipY { Formatter = Lens.TooltipFormatter(l, k, units) }
+        }
     };
 
     protected override void OnParametersSet()
@@ -323,6 +363,7 @@ else
         latestNominal = null;
         baseMonth = null;
         failed = false;
+        chartRendering = true;
 
         try
         {
@@ -362,7 +403,7 @@ else
             latestNominal = lastNominal?.Value;
             latestNominalDate = lastNominal?.Date;
 
-            options = BuildOptions(lens, kind);
+            options = BuildOptions(lens, kind, series?.Units ?? "");
         }
         catch (Exception ex)
         {

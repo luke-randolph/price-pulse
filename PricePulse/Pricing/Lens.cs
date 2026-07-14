@@ -126,4 +126,34 @@ public static class Lens
             ? "function (val) { return val >= 1000 ? '$' + Math.round(val).toLocaleString() : '$' + val.toFixed(2); }"
             : "function (val) { return val.toFixed(1); }";
     }
+
+    // A "per X" unit ("per dozen", "per gallon") is a clean denominator we can fold into labels.
+    // Descriptor units ("price index", "U.S. median · MSPUS") are not, so they stay out of the axis.
+    private static bool IsPerUnit(string units) => units.StartsWith("per ", StringComparison.OrdinalIgnoreCase);
+
+    // Y-axis title for the active lens: dollars/index/work-time, with the "per X" unit folded in when
+    // it reads cleanly (e.g. "$ per dozen"). Non-"per" units fall back to the plain measure.
+    public static string AxisTitle(PriceLens lens, SeriesKind kind, string units)
+    {
+        if (lens == PriceLens.TimePrice) return "Work time";
+        if (IsDollar(kind))
+        {
+            return IsPerUnit(units) ? $"$ {units}"
+                : lens == PriceLens.RealDollars ? "Today's dollars" : "Dollars";
+        }
+        return "Index";
+    }
+
+    // JS tooltip formatter: same value formatting as the axis ticks, plus the "per X" unit suffix so a
+    // hovered point reads e.g. "$4.99 per dozen" or "12 min per dozen". Index series get no suffix.
+    public static string TooltipFormatter(PriceLens lens, SeriesKind kind, string units)
+    {
+        var suffix = IsPerUnit(units) ? " " + units : "";
+        var value = lens == PriceLens.TimePrice
+            ? "var m = val * 60; var t = m < 60 ? m.toFixed(0) + ' min' : val < 40 ? val.toFixed(1) + ' hr' : val < 2080 ? (val / 40).toFixed(1) + ' wk' : (val / 2080).toFixed(1) + ' yr';"
+            : IsDollar(kind)
+                ? "var t = val >= 1000 ? '$' + Math.round(val).toLocaleString() : '$' + val.toFixed(2);"
+                : "var t = val.toFixed(1);";
+        return "function (val) { " + value + " return t + '" + suffix + "'; }";
+    }
 }
