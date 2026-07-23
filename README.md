@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/luke-randolph/price-pulse/actions/workflows/ci.yml/badge.svg)](https://github.com/luke-randolph/price-pulse/actions/workflows/ci.yml)
 
-A .NET 9 Blazor web app that tracks U.S. consumer prices — groceries, energy, housing, healthcare, and more — using official data from [FRED](https://fred.stlouisfed.org/) (the St. Louis Fed's economic data service). Beyond the raw numbers, it reframes prices through three **lenses** so the data actually means something: today's dollars, and hours of work.
+A .NET 9 Blazor web app that tracks U.S. consumer prices — groceries, energy, housing, healthcare, and more — using official data from [FRED](https://fred.stlouisfed.org/) (the St. Louis Fed's economic data service). Beyond the raw numbers, it reframes prices through three **lenses** so the data actually means something: the nominal price, today's dollars, and hours of work.
 
 > _Add a screenshot or two here — the dashboard and a series detail page make a strong first impression._
 >
@@ -11,7 +11,7 @@ A .NET 9 Blazor web app that tracks U.S. consumer prices — groceries, energy, 
 ## What it does
 
 - **Dashboard** — every tracked item as a card grouped by category, each showing the latest price, year-over-year change, and a 10-year sparkline.
-- **Series detail pages** — full price history with selectable ranges (past year / 10 years / 50 years) and a "then → now" summary.
+- **Series detail pages** — full price history with selectable ranges (past year / 10 / 25 / 50 years) and a "then → now" summary.
 - **Three lenses** for viewing any price:
   - **Nominal** — the price as reported.
   - **Inflation-adjusted** — past prices restated in today's dollars using CPI, so amounts compare like-for-like.
