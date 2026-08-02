@@ -9,9 +9,9 @@
     </div>
 </div>
 
-<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+<button type="button" title="Navigation menu" class="navbar-toggler @(open ? "open" : "")" @onclick="() => open = !open"></button>
 
-<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
+<div class="nav-scrollable @(open ? "open" : "")">
     <nav class="nav flex-column">
         @if (series is not null)
         {
@@ -24,7 +24,7 @@
                     @foreach (var s in group)
                     {
                         <div class="nav-item px-3">
-                            <NavLink class="nav-link" href="@($"series/{s.Id}")">
+                            <NavLink class="nav-link" href="@($"series/{s.Id}")" @onclick="() => open = false">
                                 <SeriesIcon Icon="@s.Icon" /> @s.Name
                             </NavLink>
                         </div>
@@ -33,7 +33,7 @@
             }
         }
         <div class="nav-item nav-about px-3">
-            <NavLink class="nav-link" href="about">
+            <NavLink class="nav-link" href="about" @onclick="() => open = false">
                 <SeriesIcon Icon="info" /> About
             </NavLink>
         </div>
@@ -42,6 +42,7 @@
 
 @code {
     private IReadOnlyList<Series>? series;
+    private bool open;
 
     protected override void OnInitialized()
     {
