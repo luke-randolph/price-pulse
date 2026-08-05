@@ -1,7 +1,7 @@
 namespace PricePulse.Services;
 
-// Keeps the price cache fresh. The cache is warmed synchronously at startup (Program.cs), so this
-// waits a full interval before its first pass, then picks up each month's new FRED data.
+// Loads the price cache on startup, then refreshes it on a timer. The first pass starts immediately
+// but nothing waits on it, so the app serves (with a loading state) before FRED has answered.
 public class DataSyncService : BackgroundService
 {
     private static readonly TimeSpan RefreshInterval = TimeSpan.FromHours(12);
@@ -21,15 +21,6 @@ public class DataSyncService : BackgroundService
         {
             try
             {
-                await Task.Delay(RefreshInterval, stoppingToken);
-            }
-            catch (OperationCanceledException)
-            {
-                break;
-            }
-
-            try
-            {
                 using var scope = _scopeFactory.CreateScope();
                 var loader = scope.ServiceProvider.GetRequiredService<FredDataLoader>();
                 var total = await loader.RefreshAsync(stoppingToken);
@@ -42,6 +33,15 @@ public class DataSyncService : BackgroundService
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Price cache refresh failed.");
+            }
+
+            try
+            {
+                await Task.Delay(RefreshInterval, stoppingToken);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
             }
         }
     }

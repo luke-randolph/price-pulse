@@ -4,7 +4,7 @@ using PricePulse.Models;
 namespace PricePulse.Services;
 
 // Fetches every catalog series from FRED and publishes the result to PriceStore. This is the only
-// path that talks to FRED. Runs once at startup (warm-up) and periodically via DataSyncService.
+// path that talks to FRED. Driven entirely by DataSyncService.
 public class FredDataLoader
 {
     private readonly FredClient _fred;

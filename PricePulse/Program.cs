@@ -19,37 +19,25 @@ builder.Services.AddRazorComponents()
 builder.Services.AddHttpClient<FredClient>(client =>
 {
     client.BaseAddress = new Uri("https://api.stlouisfed.org/");
-});
+})
+.AddStandardResilienceHandler();
 
 // Price data is a small, read-mostly mirror of FRED, so it lives in memory rather than a database:
-// FredDataLoader warms PriceStore at startup and DataSyncService refreshes it on a timer. FRED is
-// the source of truth, so there is nothing to persist.
+// DataSyncService runs FredDataLoader on startup and on a timer; each pass replaces the PriceStore
+// snapshot. FRED is the source of truth, so there is nothing to persist.
 builder.Services.AddSingleton<PriceStore>();
 builder.Services.AddScoped<FredDataLoader>();
 builder.Services.AddScoped<PriceService>();
 builder.Services.AddHostedService<DataSyncService>();
+
+builder.Services.AddHealthChecks()
+    .AddCheck<PriceCacheHealthCheck>("price-cache");
 
 builder.Services.AddRadzenComponents();
 
 builder.Services.AddApexCharts();
 
 var app = builder.Build();
-
-// Warm the cache before serving so the first request is instant. Best-effort: a missing API key or
-// a FRED outage must not stop the app from starting — the background refresher will retry.
-using (var scope = app.Services.CreateScope())
-{
-    var loader = scope.ServiceProvider.GetRequiredService<FredDataLoader>();
-    try
-    {
-        var total = await loader.RefreshAsync();
-        app.Logger.LogInformation("Price cache warmed: {Total} observations.", total);
-    }
-    catch (Exception ex)
-    {
-        app.Logger.LogError(ex, "Initial price load failed; starting with an empty cache.");
-    }
-}
 
 if (!app.Environment.IsDevelopment())
 {
@@ -60,11 +48,12 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-
 app.UseAntiforgery();
 
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
+
+app.MapHealthChecks("/health");
 
 app.Run();

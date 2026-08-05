@@ -31,10 +31,10 @@ The price data is a small, read-mostly mirror of FRED (~20 series, a few MB), an
 - **`FredClient`** — a typed `HttpClient` that fetches series observations from FRED.
 - **`FredDataLoader`** — fetches every catalog series (bounded concurrency) and publishes a fresh snapshot to the store. A series that fails to fetch keeps its previous data, so a transient FRED hiccup never blanks the cache.
 - **`PriceStore`** — a singleton holding the current snapshot. New snapshots are swapped in atomically, so reads are lock-free and never see a torn map.
-- **`DataSyncService`** — a background service that refreshes the store every 12 hours.
+- **`DataSyncService`** — a background service that loads the store on startup, then refreshes it every 12 hours.
 - **`PriceService`** — the read-side API the pages use; every read is served synchronously from memory.
 
-The cache is **warmed at startup before the app accepts traffic**, so the first request is already fast. If the FRED key is missing or FRED is unavailable, the app starts anyway with an empty cache and the background service retries — startup is never blocked by an upstream outage.
+The cache **loads in the background as the app starts**, so an upstream outage can never block or slow a deploy. Pages show a loading state until the first pass lands, and `/health` reports `Degraded` (still HTTP 200) while the cache is empty. FRED calls go through a standard resilience handler — retry with backoff, per-attempt and total timeouts, and a circuit breaker.
 
 `PricePulse/Pricing/Lens.cs` holds the pure functions behind the lenses (CPI real-dollar adjustment, work-time conversion, and display formatting) — which is also where the test suite is focused.
 
@@ -50,7 +50,7 @@ dotnet user-secrets set "Fred:ApiKey" "<your-key>" --project PricePulse
 dotnet run --project PricePulse
 ```
 
-Then open the URL shown in the console. On startup the app fetches the full history for each series into memory (a few seconds), after which every page serves instantly.
+Then open the URL shown in the console. The app fetches the full history for each series into memory in the background (a few seconds) — the dashboard shows a loading state until that lands, after which every page serves instantly.
 
 ## Tests
 

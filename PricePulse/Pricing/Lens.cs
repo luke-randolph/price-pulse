@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text.Json;
 using PricePulse.Models;
 
 namespace PricePulse.Pricing;
@@ -18,6 +20,9 @@ public static class Lens
 
     private const decimal HoursPerWorkWeek = 40m;
     private const decimal HoursPerWorkYear = 2080m;      // 40 hr × 52 wk
+    private const decimal MinutesPerHour = 60m;
+    private const decimal WholeDollarThreshold = 1000m;
+    private const string Locale = "en-US";
 
     public static IReadOnlyList<PriceLens> LensesFor(SeriesKind kind) => kind switch
     {
@@ -102,29 +107,16 @@ public static class Lens
 
     // Big-ticket dollars (homes, wages × year) read better without cents.
     public static string FormatDollars(decimal value) =>
-        Math.Abs(value) >= 1000m ? value.ToString("C0") : value.ToString("C2");
+        Math.Abs(value) >= WholeDollarThreshold ? value.ToString("C0") : value.ToString("C2");
 
     // Natural unit for hours of work: minutes / hours / weeks / years.
     public static string FormatWorkTime(decimal hours)
     {
-        var minutes = hours * 60m;
-        if (minutes < 60m) return $"{minutes:0} min";
+        var minutes = hours * MinutesPerHour;
+        if (minutes < MinutesPerHour) return $"{minutes:0} min";
         if (hours < HoursPerWorkWeek) return $"{hours:0.0} hr";
         if (hours < HoursPerWorkYear) return $"{hours / HoursPerWorkWeek:0.0} wk";
         return $"{hours / HoursPerWorkYear:0.0} yr";
-    }
-
-    // JS Y-axis formatter, mirroring the C# formatters for the chart ticks (renders browser-side).
-    public static string AxisFormatter(PriceLens lens, SeriesKind kind)
-    {
-        if (lens == PriceLens.TimePrice)
-        {
-            return "function (val) { var m = val * 60; if (m < 60) return m.toFixed(0) + ' min'; if (val < 40) return val.toFixed(1) + ' hr'; if (val < 2080) return (val / 40).toFixed(1) + ' wk'; return (val / 2080).toFixed(1) + ' yr'; }";
-        }
-
-        return IsDollar(kind)
-            ? "function (val) { return val >= 1000 ? '$' + Math.round(val).toLocaleString() : '$' + val.toFixed(2); }"
-            : "function (val) { return val.toFixed(1); }";
     }
 
     // A "per X" unit ("per dozen", "per gallon") is a clean denominator we can fold into labels.
@@ -144,16 +136,37 @@ public static class Lens
         return "Index";
     }
 
-    // JS tooltip formatter: same value formatting as the axis ticks, plus the "per X" unit suffix so a
-    // hovered point reads e.g. "$4.99 per dozen" or "12 min per dozen". Index series get no suffix.
-    public static string TooltipFormatter(PriceLens lens, SeriesKind kind, string units)
+    // ApexCharts labels ticks and tooltips browser-side, so these emit the JS equivalents of
+    // FormatWorkTime / FormatDollars / FormatValue from the same constants.
+    public static string AxisFormatter(PriceLens lens, SeriesKind kind) =>
+        JsFormatter(lens, kind, suffix: "");
+
+    // The "per X" suffix makes a hovered point read "$4.99 per dozen". Other units get none.
+    public static string TooltipFormatter(PriceLens lens, SeriesKind kind, string units) =>
+        JsFormatter(lens, kind, IsPerUnit(units) ? " " + units : "");
+
+    private static string JsFormatter(PriceLens lens, SeriesKind kind, string suffix)
     {
-        var suffix = IsPerUnit(units) ? " " + units : "";
-        var value = lens == PriceLens.TimePrice
-            ? "var m = val * 60; var t = m < 60 ? m.toFixed(0) + ' min' : val < 40 ? val.toFixed(1) + ' hr' : val < 2080 ? (val / 40).toFixed(1) + ' wk' : (val / 2080).toFixed(1) + ' yr';"
-            : IsDollar(kind)
-                ? "var t = val >= 1000 ? '$' + Math.round(val).toLocaleString() : '$' + val.toFixed(2);"
-                : "var t = val.toFixed(1);";
-        return "function (val) { " + value + " return t + '" + suffix + "'; }";
+        var result = suffix.Length == 0 ? "t" : $"t + {JsString(suffix)}";
+        return $"function (val) {{ {JsValue(lens, kind)} return {result}; }}";
     }
+
+    private static string JsValue(PriceLens lens, SeriesKind kind) => lens switch
+    {
+        PriceLens.TimePrice =>
+            $"var m = val * {Js(MinutesPerHour)}; " +
+            $"var t = m < {Js(MinutesPerHour)} ? m.toFixed(0) + ' min' " +
+            $": val < {Js(HoursPerWorkWeek)} ? val.toFixed(1) + ' hr' " +
+            $": val < {Js(HoursPerWorkYear)} ? (val / {Js(HoursPerWorkWeek)}).toFixed(1) + ' wk' " +
+            $": (val / {Js(HoursPerWorkYear)}).toFixed(1) + ' yr';",
+        _ when IsDollar(kind) =>
+            $"var t = val >= {Js(WholeDollarThreshold)} " +
+            $"? '$' + Math.round(val).toLocaleString('{Locale}') : '$' + val.toFixed(2);",
+        _ =>
+            $"var t = val.toLocaleString('{Locale}', {{ minimumFractionDigits: 1, maximumFractionDigits: 1 }});"
+    };
+
+    private static string Js(decimal value) => value.ToString(CultureInfo.InvariantCulture);
+
+    private static string JsString(string value) => JsonSerializer.Serialize(value);
 }
