@@ -19,7 +19,7 @@ public static class Lens
     public const string WageSeriesId = "CEU0500000008";  // production & nonsupervisory wage, NSA, back to 1964
 
     private const decimal HoursPerWorkWeek = 40m;
-    private const decimal HoursPerWorkYear = 2080m;      // 40 hr × 52 wk
+    public const decimal HoursPerWorkYear = 2080m;       // 40 hr × 52 wk
     private const decimal MinutesPerHour = 60m;
     private const decimal WholeDollarThreshold = 1000m;
     private const string Locale = "en-US";
@@ -85,6 +85,21 @@ public static class Lens
         }
 
         return result;
+    }
+
+    public static decimal? PercentChangeOverYears(IReadOnlyList<LensPoint> points, int years)
+    {
+        if (points.Count == 0)
+        {
+            return null;
+        }
+
+        var latest = points[^1];
+        var then = points.LastOrDefault(p => p.Date <= latest.Date.AddYears(-years));
+
+        return then is null || then.Value == 0
+            ? null
+            : (latest.Value - then.Value) / then.Value * 100m;
     }
 
     // Hours of work a price costs at a specific hourly wage — powers the personalized headline.

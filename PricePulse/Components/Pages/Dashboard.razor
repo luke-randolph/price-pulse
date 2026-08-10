@@ -2,6 +2,7 @@
 @inject PriceService Prices
 @inject ILogger<Dashboard> Logger
 @rendermode InteractiveServer
+@implements IDisposable
 
 <PageTitle>Dashboard</PageTitle>
 
@@ -41,13 +42,13 @@
                                     </div>
 
                                     <div class="d-flex align-items-baseline justify-content-between mb-2">
-                                        <span style="font-size: 1.6rem; font-weight: 600;">
+                                        <span class="fw-semibold" style="font-size: 1.6rem;">
                                             @(card.Latest is { } v ? Lens.FormatValue(v, PriceLens.Nominal, card.Series.Kind) : "—")
                                         </span>
-                                        @if (card.YoyPercent is not null)
+                                        @if (card.YoyPercent is { } yoy)
                                         {
-                                            <span class="small @(card.YoyPercent >= 0 ? "text-danger" : "text-success")">
-                                                @(card.YoyPercent >= 0 ? "▲" : "▼") @Math.Abs(card.YoyPercent.Value).ToString("0.0")%
+                                            <span class="small">
+                                                <PercentChange Value="yoy" />
                                                 <span class="text-muted">vs 1 yr ago</span>
                                             </span>
                                         }
@@ -55,8 +56,8 @@
 
                                     @if (card.Spark.Count > 0)
                                     {
-                                        <ApexChart TItem="SparkPoint" Height="48" Options="@card.SparkOptions">
-                                            <ApexPointSeries TItem="SparkPoint" Items="@card.Spark" XValue="@(p => p.Date)"
+                                        <ApexChart TItem="LensPoint" Height="48" Options="@card.SparkOptions">
+                                            <ApexPointSeries TItem="LensPoint" Items="@card.Spark" XValue="@(p => p.Date)"
                                                              YValue="@(p => p.Value)" SeriesType="SeriesType.Line" />
                                         </ApexChart>
                                     }
@@ -75,19 +76,30 @@
     private List<SeriesCard>? cards;
     private bool failed;
 
-    // Mirrors --primary in wwwroot/app.css.
-    private const string BrandPrimary = "#4f46e5";
-
     // Each chart needs its own options instance — ApexCharts writes per-chart state into it.
-    private static ApexChartOptions<SparkPoint> MakeSparkOptions() => new()
+    private static ApexChartOptions<LensPoint> MakeSparkOptions() => new()
     {
         Chart = new Chart { Sparkline = new ChartSparkline { Enabled = true } },
-        Colors = new List<string> { BrandPrimary },
+        Colors = new List<string> { ChartTheme.Primary },
         Stroke = new Stroke { Curve = Curve.Smooth, Width = 2 },
         Xaxis = new XAxis { Type = XAxisType.Datetime }
     };
 
     protected override void OnInitialized()
+    {
+        Prices.Changed += OnPricesChanged;
+        BuildCards();
+    }
+
+    private void OnPricesChanged() => InvokeAsync(() =>
+    {
+        BuildCards();
+        StateHasChanged();
+    });
+
+    public void Dispose() => Prices.Changed -= OnPricesChanged;
+
+    private void BuildCards()
     {
         try
         {
@@ -96,30 +108,20 @@
 
             foreach (var s in catalog)
             {
-                var priced = Prices.GetObservations(s.Id)
-                    .Where(o => o.Value is not null)
-                    .Select(o => new SparkPoint(o.Date.ToDateTime(TimeOnly.MinValue), o.Value!.Value))
-                    .ToList();
+                var priced = Lens.Apply(PriceLens.Nominal, Prices.GetObservations(s.Id), reference: null);
 
                 if (priced.Count == 0)
                 {
-                    result.Add(new SeriesCard(s, null, null, Array.Empty<SparkPoint>(), MakeSparkOptions()));
+                    result.Add(new SeriesCard(s, null, null, Array.Empty<LensPoint>(), MakeSparkOptions()));
                     continue;
                 }
 
                 var latest = priced[^1];
-
-                decimal? yoy = null;
-                var yearAgo = priced.LastOrDefault(p => p.Date <= latest.Date.AddYears(-1));
-                if (yearAgo is not null && yearAgo.Value != 0)
-                {
-                    yoy = (latest.Value - yearAgo.Value) / yearAgo.Value * 100m;
-                }
-
                 var sparkCutoff = latest.Date.AddYears(-10);
                 var spark = priced.Where(p => p.Date >= sparkCutoff).ToList();
 
-                result.Add(new SeriesCard(s, latest.Value, yoy, spark, MakeSparkOptions()));
+                result.Add(new SeriesCard(s, latest.Value, Lens.PercentChangeOverYears(priced, 1), spark,
+                    MakeSparkOptions()));
             }
 
             cards = result;
@@ -131,8 +133,6 @@
         }
     }
 
-    private record SparkPoint(DateTime Date, decimal Value);
-
-    private record SeriesCard(Series Series, decimal? Latest, decimal? YoyPercent, IReadOnlyList<SparkPoint> Spark,
-ApexChartOptions<SparkPoint> SparkOptions);
+    private record SeriesCard(Series Series, decimal? Latest, decimal? YoyPercent, IReadOnlyList<LensPoint> Spark,
+        ApexChartOptions<LensPoint> SparkOptions);
 }

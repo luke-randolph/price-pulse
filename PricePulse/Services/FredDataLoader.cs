@@ -32,7 +32,7 @@ public class FredDataLoader
                 var points = await _fred.GetSeriesAsync(series.Id, ct);
                 IReadOnlyList<Observation>? observations = points
                     .OrderBy(p => p.Date)
-                    .Select(p => new Observation { SeriesId = series.Id, Date = p.Date, Value = p.Value })
+                    .Select(p => new Observation { Date = p.Date, Value = p.Value })
                     .ToList();
                 return (series.Id, observations);
             }

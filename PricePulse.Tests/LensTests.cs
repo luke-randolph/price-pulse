@@ -6,7 +6,7 @@ namespace PricePulse.Tests;
 public class LensTests
 {
     private static Observation Obs(int year, int month, decimal? value) =>
-        new() { SeriesId = "X", Date = new DateOnly(year, month, 1), Value = value };
+        new() { Date = new DateOnly(year, month, 1), Value = value };
 
     // --- Nominal projection ---
 
@@ -62,8 +62,8 @@ public class LensTests
     [Fact]
     public void Apply_matchesReferenceByMonthRegardlessOfDay()
     {
-        var nominal = new[] { new Observation { SeriesId = "X", Date = new DateOnly(2020, 1, 15), Value = 100m } };
-        var cpi = new[] { new Observation { SeriesId = "C", Date = new DateOnly(2020, 1, 1), Value = 100m } };
+        var nominal = new[] { new Observation { Date = new DateOnly(2020, 1, 15), Value = 100m } };
+        var cpi = new[] { new Observation { Date = new DateOnly(2020, 1, 1), Value = 100m } };
 
         var result = Lens.Apply(PriceLens.RealDollars, nominal, cpi);
 
@@ -111,5 +111,34 @@ public class LensTests
         var cpi = new[] { Obs(2020, 1, 200m), Obs(2021, 1, 220m), Obs(2021, 2, null) };
 
         Assert.Equal(new DateTime(2021, 1, 1), Lens.BaseMonth(cpi));
+    }
+
+    // --- Percent change ---
+
+    private static LensPoint Pt(int year, decimal value) => new(new DateTime(year, 1, 1), value);
+
+    [Fact]
+    public void PercentChangeOverYears_measuresFromTheStartOfTheWindow()
+    {
+        var pts = new[] { Pt(2015, 100m), Pt(2020, 150m), Pt(2025, 200m) };
+
+        Assert.Equal(100m, Lens.PercentChangeOverYears(pts, 10));
+        Assert.Equal(33.33m, Math.Round(Lens.PercentChangeOverYears(pts, 5)!.Value, 2));
+    }
+
+    [Fact]
+    public void PercentChangeOverYears_picksTheNewestPointAtOrBeforeTheCutoff()
+    {
+        var pts = new[] { Pt(2010, 50m), Pt(2014, 100m), Pt(2015, 120m), Pt(2025, 240m) };
+
+        Assert.Equal(100m, Lens.PercentChangeOverYears(pts, 10)); // against 2015, not 2014
+    }
+
+    [Fact]
+    public void PercentChangeOverYears_isNullWhenTheChangeCannotBeComputed()
+    {
+        Assert.Null(Lens.PercentChangeOverYears(Array.Empty<LensPoint>(), 1));
+        Assert.Null(Lens.PercentChangeOverYears(new[] { Pt(2020, 100m), Pt(2025, 200m) }, 25));
+        Assert.Null(Lens.PercentChangeOverYears(new[] { Pt(2015, 0m), Pt(2025, 200m) }, 10));
     }
 }
