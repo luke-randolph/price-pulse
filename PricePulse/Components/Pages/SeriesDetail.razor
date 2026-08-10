@@ -2,12 +2,17 @@
 @inject PriceService Prices
 @inject ILogger<SeriesDetail> Logger
 @rendermode InteractiveServer
+@implements IDisposable
 
 <PageTitle>@(series?.Name ?? "Series")</PageTitle>
 
 @if (failed)
 {
     <p class="text-muted">Something went wrong loading this series. Please try again shortly.</p>
+}
+else if (!Prices.IsWarm)
+{
+    <p class="text-muted">Prices are loading — check back in a moment.</p>
 }
 else if (projections is null)
 {
@@ -20,19 +25,9 @@ else if (series is null)
 else
 {
     <h1>@series.Name</h1>
-    @if (kind == SeriesKind.PriceIndex)
+    @if (KindHelp is not null)
     {
-        <p class="text-muted small mb-3" style="max-width: 40rem;">
-            A price index tracks how prices move relative to a baseline period (set to 100) — it's a level,
-            not a dollar amount. A value of 300 means prices are 3× the baseline.
-        </p>
-    }
-    else if (kind == SeriesKind.Indicator)
-    {
-        <p class="text-muted small mb-3" style="max-width: 40rem;">
-            How much the economy produces for each hour worked. It's an index (100 = the baseline year),
-            so rising means each hour of work creates more value than before.
-        </p>
+        <p class="text-muted small mb-3 series-note">@KindHelp</p>
     }
 
     @if (Displayed.Count > 0)
@@ -80,7 +75,7 @@ else
         {
             <RadzenCard class="mb-4" style="max-width: 26rem;">
                 <div class="text-muted">@HeadlineTitle</div>
-                <div style="font-size: 2rem; font-weight: 600;">@HeadlineValue</div>
+                <div class="fw-semibold" style="font-size: 2rem;">@HeadlineValue</div>
                 <div class="text-primary small">@series.Units</div>
                 <div class="text-muted">@HeadlineSubtitle</div>
                 @if (ComparativeText is not null)
@@ -105,9 +100,8 @@ else
                             <div class="text-muted small">@label</div>
                             @if (ChangePercent(years) is { } pct)
                             {
-                                <div class="@(pct >= 0 ? "text-danger" : "text-success")"
-                                     style="font-size: 1.15rem; font-weight: 600;">
-                                    @(pct >= 0 ? "▲" : "▼") @Math.Abs(pct).ToString("0.0")%
+                                <div class="fw-semibold" style="font-size: 1.15rem;">
+                                    <PercentChange Value="pct" />
                                 </div>
                             }
                             else
@@ -183,8 +177,6 @@ else
     private bool rateIsSalary;
     private bool chartRendering = true;
 
-    private const decimal HoursPerWorkYear = 2080m;
-
     private ApexChartOptions<LensPoint> options = BuildOptions(PriceLens.Nominal, SeriesKind.Price, "");
 
     private IReadOnlyList<LensPoint> Displayed =>
@@ -205,9 +197,8 @@ else
         }
     }
 
-    // Custom rate → hourly (salary assumes a 2,080-hour work year).
     private decimal? HourlyWage =>
-        customRate is { } r && r > 0 ? (rateIsSalary ? r / HoursPerWorkYear : r) : null;
+        customRate is { } r && r > 0 ? (rateIsSalary ? r / Lens.HoursPerWorkYear : r) : null;
 
     // Personalization affects only this headline number, never the curve.
     private bool Personalized => lens == PriceLens.TimePrice && HourlyWage is not null;
@@ -310,23 +301,7 @@ else
 
     private string ChangeCardTitle => Lens.IsDollar(kind) ? "Price change" : "Change";
 
-    private decimal? ChangePercent(int years)
-    {
-        var pts = Displayed;
-        if (pts.Count == 0)
-        {
-            return null;
-        }
-
-        var latest = pts[^1];
-        var then = pts.LastOrDefault(p => p.Date <= latest.Date.AddYears(-years));
-        if (then is null || then.Value == 0)
-        {
-            return null;
-        }
-
-        return (latest.Value - then.Value) / then.Value * 100m;
-    }
+    private decimal? ChangePercent(int years) => Lens.PercentChangeOverYears(Displayed, years);
 
     private string? InflationContext
     {
@@ -368,12 +343,23 @@ else
         get
         {
             if (averageWage is not { } w) return "average non-executive worker";
-            return rateIsSalary ? $"avg non-executive: {w * HoursPerWorkYear:C0}" : $"avg non-executive: {w:C2}";
+            return rateIsSalary ? $"avg non-executive: {w * Lens.HoursPerWorkYear:C0}" : $"avg non-executive: {w:C2}";
         }
     }
 
     // The period real-dollar values are expressed in: the latest CPI month, i.e. "today's dollars".
     private string BaseMonthLabel => baseMonth?.ToString("MMMM yyyy") ?? "today's";
+
+    private string? KindHelp => kind switch
+    {
+        SeriesKind.PriceIndex =>
+            "A price index tracks how prices move relative to a baseline period (set to 100) — it's a level, " +
+            "not a dollar amount. A value of 300 means prices are 3× the baseline.",
+        SeriesKind.Indicator =>
+            "How much the economy produces for each hour worked. It's an index (100 = the baseline year), " +
+            "so rising means each hour of work creates more value than before.",
+        _ => null
+    };
 
     private string? LensHelp => lens switch
     {
@@ -404,18 +390,10 @@ else
         }
     }
 
-    // Mirror the palette in wwwroot/app.css; the line takes on the active lens's color.
-    private static string LensColor(PriceLens l) => l switch
-    {
-        PriceLens.RealDollars => "#3949ab", // --blue
-        PriceLens.TimePrice => "#7c3aed", // --purple
-        _ => "#4f46e5"                       // --indigo (--primary)
-    };
-
     private static ApexChartOptions<LensPoint> BuildOptions(PriceLens l, SeriesKind k, string units) => new()
     {
         Chart = new Chart { Toolbar = new Toolbar { Show = false } },
-        Colors = new List<string> { LensColor(l) },
+        Colors = new List<string> { ChartTheme.ForLens(l) },
         Stroke = new Stroke { Curve = Curve.Straight, Width = 2 },
         Xaxis = new XAxis { Type = XAxisType.Datetime },
         Yaxis = new List<YAxis>
@@ -438,6 +416,16 @@ else
         }
     };
 
+    protected override void OnInitialized() => Prices.Changed += OnPricesChanged;
+
+    private void OnPricesChanged() => InvokeAsync(() =>
+    {
+        Load();
+        StateHasChanged();
+    });
+
+    public void Dispose() => Prices.Changed -= OnPricesChanged;
+
     protected override void OnParametersSet()
     {
         if (Id == loadedId)
@@ -446,12 +434,17 @@ else
         }
 
         loadedId = Id;
+        chartRendering = true;
+        Load();
+    }
+
+    private void Load()
+    {
         series = null;
         projections = null;
         latestNominal = null;
         baseMonth = null;
         failed = false;
-        chartRendering = true;
 
         try
         {

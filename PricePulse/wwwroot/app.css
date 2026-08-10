@@ -127,6 +127,10 @@ h1:focus {
   text-align: start;
 }
 
+.series-note {
+  max-width: 40rem;
+}
+
 /* Reserve the chart's footprint so the spinner occupies the same space and there's no layout shift
    when ApexCharts finishes drawing. Height mirrors the chart's Height="400". */
 .chart-wrap {

@@ -1,0 +1,7 @@
+<span class="@(Value >= 0 ? "text-danger" : "text-success")">@(Value >= 0 ? "▲" : "▼") @Math.Abs(Value).ToString("0.0")%</span>
+
+@code {
+    [Parameter]
+    [EditorRequired]
+    public decimal Value { get; set; }
+}

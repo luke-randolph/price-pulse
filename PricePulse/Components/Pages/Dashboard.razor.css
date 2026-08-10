@@ -27,5 +27,5 @@
 }
 
 .dashboard ::deep .dashboard-card:hover {
-  box-shadow: 0 0.25rem 0.75rem rgba(79, 70, 229, 0.2);
+  box-shadow: 0 0.25rem 0.75rem rgb(from var(--indigo) r g b / 0.2);
 }
