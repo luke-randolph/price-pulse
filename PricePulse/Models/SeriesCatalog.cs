@@ -1,3 +1,5 @@
+using PricePulse.Pricing;
+
 namespace PricePulse.Models;
 
 public static class SeriesCatalog
@@ -40,7 +42,12 @@ public static class SeriesCatalog
         // Productivity — real index
         new() { Id = "OPHNFB", Name = "Productivity", Units = "output per hour", Icon = "speed", Category = SeriesCategory.Productivity, Kind = SeriesKind.Indicator },
 
-        // Reference only — hidden from the catalog, powers the inflation lens
-        new() { Id = "CPIAUCNS", Name = "Consumer Price Index", Units = "price index", Icon = "trending_up", Category = SeriesCategory.Housing, Kind = SeriesKind.PriceIndex, IsReference = true },
     };
+
+    // Powers the inflation lens but has no page of its own, so it carries no display metadata — the
+    // loader only needs the ID. The wage series is not here: it backs the work-time lens and is browsable.
+    private static readonly IReadOnlyList<string> ReferenceIds = new[] { Lens.CpiSeriesId };
+
+    public static readonly IReadOnlyList<string> FetchIds =
+        All.Select(s => s.Id).Concat(ReferenceIds).ToList();
 }

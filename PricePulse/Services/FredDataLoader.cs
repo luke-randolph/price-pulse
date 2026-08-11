@@ -7,6 +7,8 @@ namespace PricePulse.Services;
 // path that talks to FRED. Driven entirely by DataSyncService.
 public class FredDataLoader
 {
+    private const int MaxConcurrentFetches = 6;
+
     private readonly FredClient _fred;
     private readonly PriceStore _store;
     private readonly ILogger<FredDataLoader> _logger;
@@ -22,24 +24,24 @@ public class FredDataLoader
     // whatever data it already had, so a transient FRED hiccup never blanks out a warm cache.
     public async Task<int> RefreshAsync(CancellationToken ct = default)
     {
-        using var gate = new SemaphoreSlim(6);
+        using var gate = new SemaphoreSlim(MaxConcurrentFetches);
 
-        var fetches = SeriesCatalog.All.Select(async series =>
+        var fetches = SeriesCatalog.FetchIds.Select(async seriesId =>
         {
             await gate.WaitAsync(ct);
             try
             {
-                var points = await _fred.GetSeriesAsync(series.Id, ct);
+                var points = await _fred.GetSeriesAsync(seriesId, ct);
                 IReadOnlyList<Observation>? observations = points
                     .OrderBy(p => p.Date)
                     .Select(p => new Observation { Date = p.Date, Value = p.Value })
                     .ToList();
-                return (series.Id, observations);
+                return (seriesId, observations);
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "FRED fetch failed for series {SeriesId}", series.Id);
-                return (series.Id, observations: (IReadOnlyList<Observation>?)null);
+                _logger.LogWarning(ex, "FRED fetch failed for series {SeriesId}", seriesId);
+                return (seriesId, observations: (IReadOnlyList<Observation>?)null);
             }
             finally
             {
