@@ -53,7 +53,7 @@ else
         @if (LensHelp is not null)
         {
             <p class="text-muted small mb-3 d-flex align-items-center gap-1">
-                <RadzenIcon Icon="info" Style="font-size: 1rem;" />@LensHelp
+                <RadzenIcon Icon="info" class="lens-help-icon" />@LensHelp
             </p>
         }
 
@@ -61,7 +61,7 @@ else
         {
             <div class="d-flex align-items-center gap-2 mb-3">
                 <span class="text-muted small">Your pay:</span>
-                <RadzenNumeric TValue="decimal?" @bind-Value="customRate" Placeholder="@AvgWagePlaceholder" Style="width: 16rem;" />
+                <RadzenNumeric TValue="decimal?" @bind-Value="customRate" Placeholder="@AvgWagePlaceholder" class="pay-input" />
                 <RadzenSelectBar @bind-Value="rateIsSalary" TValue="bool" Size="ButtonSize.Small">
                     <Items>
                         <RadzenSelectBarItem Text="/ hr" Value="false" />
@@ -73,45 +73,49 @@ else
 
         @if (HeadlineValue is not null)
         {
-            <RadzenCard class="mb-4" style="max-width: 26rem;">
-                <div class="text-muted">@HeadlineTitle</div>
-                <div class="fw-semibold" style="font-size: 2rem;">@HeadlineValue</div>
-                <div class="text-primary small">@series.Units</div>
-                <div class="text-muted">@HeadlineSubtitle</div>
-                @if (ComparativeText is not null)
-                {
-                    <div class="text-muted small mt-2 fst-italic">@ComparativeText</div>
-                }
-                @if (InflationContext is not null)
-                {
-                    <div class="text-muted small mt-2">@InflationContext</div>
-                }
-            </RadzenCard>
+            <div class="headline-card">
+                <RadzenCard class="mb-4">
+                    <div class="text-muted">@HeadlineTitle</div>
+                    <div class="fw-semibold headline-value">@HeadlineValue</div>
+                    <div class="text-primary small">@series.Units</div>
+                    <div class="text-muted">@HeadlineSubtitle</div>
+                    @if (ComparativeText is not null)
+                    {
+                        <div class="text-muted small mt-2 fst-italic">@ComparativeText</div>
+                    }
+                    @if (InflationContext is not null)
+                    {
+                        <div class="text-muted small mt-2">@InflationContext</div>
+                    }
+                </RadzenCard>
+            </div>
         }
 
         @if (lens == PriceLens.Nominal && LensPoints.Count > 1)
         {
-            <RadzenCard class="mb-4" style="max-width: 34rem;">
-                <div class="text-muted small mb-2">@ChangeCardTitle</div>
-                <div class="d-flex flex-wrap gap-4">
-                    @foreach (var (years, label) in ChangeHorizons)
-                    {
-                        <div>
-                            <div class="text-muted small">@label</div>
-                            @if (ChangePercent(years) is { } pct)
-                            {
-                                <div class="fw-semibold" style="font-size: 1.15rem;">
-                                    <PercentChange Value="pct" />
-                                </div>
-                            }
-                            else
-                            {
-                                <div class="text-muted" style="font-size: 1.15rem;">—</div>
-                            }
-                        </div>
-                    }
-                </div>
-            </RadzenCard>
+            <div class="change-card">
+                <RadzenCard class="mb-4">
+                    <div class="text-muted small mb-2">@ChangeCardTitle</div>
+                    <div class="d-flex flex-wrap gap-4">
+                        @foreach (var (years, label) in ChangeHorizons)
+                        {
+                            <div>
+                                <div class="text-muted small">@label</div>
+                                @if (ChangePercent(years) is { } pct)
+                                {
+                                    <div class="fw-semibold change-value">
+                                        <PercentChange Value="pct" />
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="text-muted change-value">—</div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </RadzenCard>
+            </div>
         }
 
         <RadzenSelectBar @bind-Value="rangeYears" @bind-Value:after="OnRangeChanged" TValue="int" Size="ButtonSize.Small"

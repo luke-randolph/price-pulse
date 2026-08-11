@@ -52,35 +52,12 @@ body {
   color: var(--foreground);
 }
 
-a,
-.btn-link {
+a {
   color: var(--primary);
 }
 
-a:hover,
-.btn-link:hover {
+a:hover {
   color: var(--primary-hover);
-}
-
-.btn-primary {
-  color: var(--white);
-  background-color: var(--primary);
-  border-color: var(--primary-hover);
-}
-
-.btn-primary:hover {
-  background-color: var(--primary-hover);
-  border-color: var(--primary-hover);
-}
-
-.btn:focus,
-.btn:active:focus,
-.btn-link.nav-link:focus,
-.form-control:focus,
-.form-check-input:focus {
-  box-shadow:
-    0 0 0 0.1rem var(--white),
-    0 0 0 0.25rem var(--primary);
 }
 
 h1,
@@ -92,72 +69,7 @@ h6 {
   color: var(--heading);
 }
 
-.content {
-  padding: 1.5rem;
-}
-
+/* FocusOnNavigate targets h1 on every navigation. */
 h1:focus {
   outline: none;
-}
-
-.valid.modified:not([type="checkbox"]) {
-  outline: 1px solid var(--success);
-}
-
-.invalid {
-  outline: 1px solid var(--destructive);
-}
-
-.validation-message {
-  color: var(--destructive);
-}
-
-.darker-border-checkbox.form-check-input {
-  border-color: var(--gray);
-}
-
-.form-floating > .form-control-plaintext::placeholder,
-.form-floating > .form-control::placeholder {
-  color: var(--bs-secondary-color);
-  text-align: end;
-}
-
-.form-floating > .form-control-plaintext:focus::placeholder,
-.form-floating > .form-control:focus::placeholder {
-  text-align: start;
-}
-
-.series-note {
-  max-width: 40rem;
-}
-
-/* Reserve the chart's footprint so the spinner occupies the same space and there's no layout shift
-   when ApexCharts finishes drawing. Height mirrors the chart's Height="400". */
-.chart-wrap {
-  position: relative;
-  min-height: 400px;
-}
-
-.chart-loading {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2;
-}
-
-.chart-spinner {
-  width: 2.5rem;
-  height: 2.5rem;
-  border: 3px solid var(--indigo-lighter);
-  border-top-color: var(--primary);
-  border-radius: 50%;
-  animation: chart-spin 0.7s linear infinite;
-}
-
-@keyframes chart-spin {
-  to {
-    transform: rotate(360deg);
-  }
 }

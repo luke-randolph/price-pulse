@@ -42,7 +42,7 @@
                                     </div>
 
                                     <div class="d-flex align-items-baseline justify-content-between mb-2">
-                                        <span class="fw-semibold" style="font-size: 1.6rem;">
+                                        <span class="fw-semibold card-value">
                                             @(card.Latest is { } v ? Lens.FormatValue(v, PriceLens.Nominal, card.Series.Kind) : "—")
                                         </span>
                                         @if (card.YoyPercent is { } yoy)

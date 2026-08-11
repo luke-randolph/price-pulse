@@ -1,0 +1,59 @@
+.series-note {
+  max-width: 40rem;
+}
+
+.headline-card {
+  max-width: 26rem;
+}
+
+.headline-value {
+  font-size: 2rem;
+}
+
+.change-card {
+  max-width: 34rem;
+}
+
+.change-value {
+  font-size: 1.15rem;
+}
+
+/* Radzen renders these elements, so they need ::deep to pick up this component's scope. */
+::deep .lens-help-icon {
+  font-size: 1rem;
+}
+
+::deep .pay-input {
+  width: 16rem;
+}
+
+/* Reserve the chart's footprint so the spinner occupies the same space and there's no layout shift
+   when ApexCharts finishes drawing. Height mirrors the chart's Height="400". */
+.chart-wrap {
+  position: relative;
+  min-height: 400px;
+}
+
+.chart-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+
+.chart-spinner {
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 3px solid var(--indigo-lighter);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: chart-spin 0.7s linear infinite;
+}
+
+@keyframes chart-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
