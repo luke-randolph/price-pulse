@@ -13,13 +13,13 @@ public class PriceService
         _store = store;
     }
 
-    // Reference series (CPI, wages) power the lenses but are not consumer goods, so keep them out of the catalog.
-    public IReadOnlyList<Series> GetSeries() =>
+    private static readonly IReadOnlyList<Series> Sorted =
         SeriesCatalog.All
-            .Where(s => !s.IsReference)
             .OrderBy(s => s.Category)
             .ThenBy(s => s.Name)
             .ToList();
+
+    public IReadOnlyList<Series> GetSeries() => Sorted;
 
     public IReadOnlyList<Observation> GetObservations(string seriesId) =>
         _store.GetObservations(seriesId);

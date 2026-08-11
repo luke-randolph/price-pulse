@@ -30,19 +30,19 @@ else
         <p class="text-muted small mb-3 series-note">@KindHelp</p>
     }
 
-    @if (Displayed.Count > 0)
+    @if (LensPoints.Count > 0)
     {
-        @if (available.Count > 1)
+        @if (availableLenses.Count > 1)
         {
             <RadzenSelectBar @bind-Value="lens" @bind-Value:after="OnLensChanged" TValue="PriceLens" Size="ButtonSize.Small"
                              class="mb-3">
                 <Items>
                     <RadzenSelectBarItem Text="@NominalLabel" Value="PriceLens.Nominal" />
-                    @if (available.Contains(PriceLens.RealDollars))
+                    @if (availableLenses.Contains(PriceLens.RealDollars))
                     {
                         <RadzenSelectBarItem Text="Inflation adjusted" Value="PriceLens.RealDollars" />
                     }
-                    @if (available.Contains(PriceLens.TimePrice))
+                    @if (availableLenses.Contains(PriceLens.TimePrice))
                     {
                         <RadzenSelectBarItem Text="Work-time" Value="PriceLens.TimePrice" />
                     }
@@ -89,7 +89,7 @@ else
             </RadzenCard>
         }
 
-        @if (lens == PriceLens.Nominal && Displayed.Count > 1)
+        @if (lens == PriceLens.Nominal && LensPoints.Count > 1)
         {
             <RadzenCard class="mb-4" style="max-width: 34rem;">
                 <div class="text-muted small mb-2">@ChangeCardTitle</div>
@@ -114,7 +114,7 @@ else
             </RadzenCard>
         }
 
-        <RadzenSelectBar @bind-Value="rangeYears" @bind-Value:after="ArmChartLoading" TValue="int" Size="ButtonSize.Small"
+        <RadzenSelectBar @bind-Value="rangeYears" @bind-Value:after="OnRangeChanged" TValue="int" Size="ButtonSize.Small"
                          class="mb-3">
             <Items>
                 <RadzenSelectBarItem Text="Past year" Value="1" />
@@ -124,7 +124,7 @@ else
             </Items>
         </RadzenSelectBar>
 
-        @if (Filtered.Count > 0)
+        @if (pointsInRange.Count > 0)
         {
             <div class="chart-wrap">
                 @if (chartRendering)
@@ -135,7 +135,7 @@ else
                 }
                 <ApexChart TItem="LensPoint" @key="@($"{rangeYears}-{lens}")" Height="400" Options="@options"
                            OnRendered="OnChartRendered">
-                    <ApexPointSeries TItem="LensPoint" Items="@Filtered" Name="@series.Name" XValue="@(p => p.Date)"
+                    <ApexPointSeries TItem="LensPoint" Items="@pointsInRange" Name="@series.Name" XValue="@(p => p.Date)"
                                      YValue="@(p => p.Value)" SeriesType="SeriesType.Line" />
                 </ApexChart>
             </div>
@@ -162,7 +162,7 @@ else
 
     private Series? series;
     private SeriesKind kind;
-    private IReadOnlyList<PriceLens> available = new[] { PriceLens.Nominal };
+    private IReadOnlyList<PriceLens> availableLenses = new[] { PriceLens.Nominal };
     private Dictionary<PriceLens, IReadOnlyList<LensPoint>>? projections;
     private decimal? latestNominal;
     private DateTime? latestNominalDate;
@@ -175,26 +175,28 @@ else
     private PriceLens lens = PriceLens.Nominal;
     private decimal? customRate;
     private bool rateIsSalary;
+    // A lens or range change recreates the chart via @key, so cover it with the spinner until OnRendered fires.
     private bool chartRendering = true;
 
     private ApexChartOptions<LensPoint> options = BuildOptions(PriceLens.Nominal, SeriesKind.Price, "");
 
-    private IReadOnlyList<LensPoint> Displayed =>
+    private IReadOnlyList<LensPoint> LensPoints =>
         projections is not null && projections.TryGetValue(lens, out var pts) ? pts : Array.Empty<LensPoint>();
 
-    private IReadOnlyList<LensPoint> Filtered
-    {
-        get
-        {
-            var pts = Displayed;
-            if (pts.Count == 0)
-            {
-                return Array.Empty<LensPoint>();
-            }
+    // Cached, so rebuild it whenever the data, the lens, or the range changes.
+    private IReadOnlyList<LensPoint> pointsInRange = Array.Empty<LensPoint>();
 
-            var cutoff = pts[^1].Date.AddYears(-rangeYears);
-            return pts.Where(p => p.Date >= cutoff).ToList();
+    private void RebuildPointsInRange()
+    {
+        var pts = LensPoints;
+        if (pts.Count == 0)
+        {
+            pointsInRange = Array.Empty<LensPoint>();
+            return;
         }
+
+        var cutoff = pts[^1].Date.AddYears(-rangeYears);
+        pointsInRange = pts.Where(p => p.Date >= cutoff).ToList();
     }
 
     private decimal? HourlyWage =>
@@ -209,7 +211,7 @@ else
     {
         get
         {
-            if (Displayed.Count == 0)
+            if (LensPoints.Count == 0)
             {
                 return null;
             }
@@ -219,7 +221,7 @@ else
                 return Lens.FormatWorkTime(Lens.TimePriceAt(price, HourlyWage!.Value));
             }
 
-            return Lens.FormatValue(Displayed[^1].Value, lens, kind);
+            return Lens.FormatValue(LensPoints[^1].Value, lens, kind);
         }
     }
 
@@ -236,7 +238,7 @@ else
     {
         get
         {
-            var date = Personalized ? latestNominalDate : Displayed[^1].Date;
+            var date = Personalized ? latestNominalDate : LensPoints[^1].Date;
             var when = date?.ToString("MMMM yyyy") ?? "";
 
             return lens == PriceLens.TimePrice && latestNominal is { } price
@@ -250,7 +252,7 @@ else
     {
         get
         {
-            var pts = Filtered;
+            var pts = pointsInRange;
             if (pts.Count < 2)
             {
                 return null;
@@ -301,7 +303,7 @@ else
 
     private string ChangeCardTitle => Lens.IsDollar(kind) ? "Price change" : "Change";
 
-    private decimal? ChangePercent(int years) => Lens.PercentChangeOverYears(Displayed, years);
+    private decimal? ChangePercent(int years) => Lens.PercentChangeOverYears(LensPoints, years);
 
     private string? InflationContext
     {
@@ -312,7 +314,7 @@ else
                 return null;
             }
 
-            var real = Filtered;
+            var real = pointsInRange;
             if (real.Count < 2)
             {
                 return null;
@@ -375,11 +377,15 @@ else
     private void OnLensChanged()
     {
         options = BuildOptions(lens, kind, series?.Units ?? "");
-        ArmChartLoading();
+        RebuildPointsInRange();
+        chartRendering = true;
     }
 
-    // A lens/range change recreates the chart via @key, so show the spinner until OnRendered fires.
-    private void ArmChartLoading() => chartRendering = true;
+    private void OnRangeChanged()
+    {
+        RebuildPointsInRange();
+        chartRendering = true;
+    }
 
     private void OnChartRendered()
     {
@@ -444,6 +450,8 @@ else
         projections = null;
         latestNominal = null;
         baseMonth = null;
+        averageWage = null;
+        pointsInRange = Array.Empty<LensPoint>();
         failed = false;
 
         try
@@ -451,8 +459,8 @@ else
             var catalog = Prices.GetSeries();
             series = catalog.FirstOrDefault(s => s.Id == Id);
             kind = series?.Kind ?? SeriesKind.Price;
-            available = Lens.LensesFor(kind);
-            if (!available.Contains(lens))
+            availableLenses = Lens.LensesFor(kind);
+            if (!availableLenses.Contains(lens))
             {
                 lens = PriceLens.Nominal;
             }
@@ -464,14 +472,14 @@ else
                 [PriceLens.Nominal] = Lens.Apply(PriceLens.Nominal, nominal, null)
             };
 
-            if (available.Contains(PriceLens.RealDollars))
+            if (availableLenses.Contains(PriceLens.RealDollars))
             {
                 var cpi = Prices.GetObservations(Lens.CpiSeriesId);
                 proj[PriceLens.RealDollars] = Lens.Apply(PriceLens.RealDollars, nominal, cpi);
                 baseMonth = Lens.BaseMonth(cpi);
             }
 
-            if (available.Contains(PriceLens.TimePrice))
+            if (availableLenses.Contains(PriceLens.TimePrice))
             {
                 var wages = Prices.GetObservations(Lens.WageSeriesId);
                 proj[PriceLens.TimePrice] = Lens.Apply(PriceLens.TimePrice, nominal, wages);
@@ -485,6 +493,7 @@ else
             latestNominalDate = lastNominal?.Date;
 
             options = BuildOptions(lens, kind, series?.Units ?? "");
+            RebuildPointsInRange();
         }
         catch (Exception ex)
         {

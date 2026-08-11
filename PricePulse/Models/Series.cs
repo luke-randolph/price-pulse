@@ -28,9 +28,6 @@ public class Series
     public required string Icon { get; set; }
     public SeriesCategory Category { get; set; }
     public SeriesKind Kind { get; set; }
-
-    // Reference series are fetched like any other series but hidden from the consumer catalog.
-    public bool IsReference { get; set; }
 }
 
 public static class SeriesCategories
