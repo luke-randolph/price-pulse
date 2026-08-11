@@ -4,6 +4,10 @@
   vertical-align: middle;
 }
 
+.card-value {
+  font-size: 1.6rem;
+}
+
 .dashboard-categories {
   display: flex;
   flex-direction: column;
